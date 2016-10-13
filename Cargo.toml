@@ -1,0 +1,9 @@
+[package]
+name = "webvr"
+version = "0.1.0"
+authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
+
+[dependencies]
+log  = "0.3"
+
+openvr_sys = "1.0.2"

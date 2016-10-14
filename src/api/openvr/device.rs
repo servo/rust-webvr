@@ -440,10 +440,11 @@ fn rot_matrix_to_quat(mut m00:f32, mut m01:f32, mut m02:f32, mut m10:f32, mut m1
 
 fn texture_bounds_to_openvr(bounds: &[f32; 4]) -> openvr::VRTextureBounds_t {
     let mut result: openvr::VRTextureBounds_t = unsafe { mem::uninitialized() };
+    // WebVR uses uMin, vMin, uWidth and vHeight bounds
     result.uMin = bounds[0];
     result.vMin = bounds[1];
-    result.uMax = bounds[2];
-    result.vMax = bounds[3]; 
+    result.uMax = result.uMin + bounds[2];
+    result.vMax = result.vMin + bounds[3]; 
     result
 }
 

@@ -1,13 +1,12 @@
 use std::mem;
+use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+use std::sync::atomic::Ordering::SeqCst;
 
-static mut DEVICE_ID_COUNTER: u64 = 0;
+static DEVICE_ID_COUNTER: AtomicUsize  = ATOMIC_USIZE_INIT;
 
 // Generates a unique identifier for any VRDevice
 pub fn new_device_id() -> u64 {
-    unsafe {
-        DEVICE_ID_COUNTER += 1;
-        DEVICE_ID_COUNTER
-    }
+    DEVICE_ID_COUNTER.fetch_add(1, SeqCst) as u64
 }
 
 // Multiply 4x4 matrices

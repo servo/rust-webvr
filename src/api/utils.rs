@@ -10,6 +10,7 @@ pub fn new_device_id() -> u64 {
 }
 
 // Multiply 4x4 matrices
+#[allow(dead_code)]
 pub fn multiply_matrix(a: &[f32; 16], b: &[f32; 16], out: &mut [f32;16]) {
     let mut tmp: [f32; 16] = unsafe { mem::uninitialized() };
 

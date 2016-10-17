@@ -1,5 +1,4 @@
 use VRDisplayData;
-use VRPose;
 use VRFrameData;
 use VRLayer;
 use std::sync::Arc;

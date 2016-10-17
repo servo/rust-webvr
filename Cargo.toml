@@ -5,5 +5,10 @@ authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 [dependencies]
 log  = "0.3"
-
 openvr_sys = "1.0.2"
+
+[dev-dependencies]
+# Dependencies required tu run the examples
+glium = "0.15"
+cgmath = "0.12"
+image = "0.10"

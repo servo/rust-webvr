@@ -42,9 +42,10 @@ impl VRService for OpenVRService {
 
         error = EVRInitError_VRInitError_None;
         unsafe {
-            let name = CString::new(constants::IVRSYSTEM_VERSION).unwrap();
+            let name = CString::new(format!("FnTable:{}",constants::IVRSYSTEM_VERSION)).unwrap();
             self.system = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
                           as *mut openvr::VR_IVRSystem_FnTable;
+            (*self.system).AcknowledgeQuit_UserPrompt.unwrap();
         }
 
         if error as u32 != EVRInitError_VRInitError_None as u32 {

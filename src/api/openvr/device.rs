@@ -201,7 +201,7 @@ impl OpenVRDevice {
         // Check is chaperone interface is available to get the play area size
         unsafe {
             let mut error = EVRInitError_VRInitError_None;
-            let name = CString::new(constants::IVRCHAPERONE_VERSION).unwrap();
+            let name = CString::new(format!("FnTable:{}",constants::IVRCHAPERONE_VERSION)).unwrap();
             let chaperone = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
                           as *mut openvr::VR_IVRChaperone_FnTable;
             if chaperone != ptr::null_mut() && error as u32 == EVRInitError_VRInitError_None as u32 {
@@ -330,11 +330,12 @@ impl OpenVRDevice {
     
         unsafe {
             let mut error = EVRInitError_VRInitError_None;
-            let name = CString::new(constants::IVRCOMPOSITOR_VERSION).unwrap();
+            let name = CString::new(format!("FnTable:{}",constants::IVRCOMPOSITOR_VERSION)).unwrap();
             self.compositor = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
                           as *mut openvr::VR_IVRCompositor_FnTable;
-            if error as u32 == EVRInitError_VRInitError_None as u32 {
+            if error as u32 != EVRInitError_VRInitError_None as u32 {
                 self.compositor = ptr::null_mut();
+                error!("Error initializing OpenVR compositor: {:?}", error as u32);
             }
         }
     }

@@ -92,11 +92,9 @@ impl VRDevice for OpenVRDevice {
 
     fn submit_frame(&mut self, layer: &VRLayer) {
         // Lazy load the compositor
-        self.ensure_compositor_initialized();
-        if self.compositor == ptr::null_mut() {
+        if !self.ensure_compositor_initialized() {
             return;
         }
-
         let mut texture: openvr::Texture_t = unsafe { mem::uninitialized() };
         texture.handle = unsafe { mem::transmute(layer.texture_id as u64) };
         texture.eColorSpace = openvr::EColorSpace::EColorSpace_ColorSpace_Auto;
@@ -111,7 +109,6 @@ impl VRDevice for OpenVRDevice {
             (*self.compositor).Submit.unwrap()(EVREye_Eye_Right, &mut texture, &mut right_bounds, flags);
             (*self.compositor).PostPresentHandoff.unwrap()();
         }
-
     }
 }
 
@@ -318,9 +315,9 @@ impl OpenVRDevice {
         }
     }
 
-    fn ensure_compositor_initialized(&mut self) {
+    fn ensure_compositor_initialized(&mut self) -> bool {
         if self.compositor != ptr::null_mut() {
-            return;
+            return true;
         }
     
         unsafe {
@@ -333,6 +330,8 @@ impl OpenVRDevice {
                 error!("Error initializing OpenVR compositor: {:?}", error as u32);
             }
         }
+
+        self.compositor != ptr::null_mut()
     }
 }
 

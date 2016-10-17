@@ -207,7 +207,12 @@ impl OpenVRDevice {
             }
         }
 
-        // Get sittong to standing transform matrix
+        if size_x == 0.0 || size_y == 0.0 {
+            // Play area not available yet
+            return;
+        }
+
+        // Get sitting to standing transform matrix
         let matrix: openvr::HmdMatrix34_t = unsafe {
             (*self.system).GetSeatedZeroPoseToStandingAbsoluteTrackingPose.unwrap()()
         };

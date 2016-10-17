@@ -90,6 +90,19 @@ impl VRDevice for OpenVRDevice {
         }
     }
 
+    fn sync_poses(&mut self) {
+        if !self.ensure_compositor_initialized() {
+            return;
+        }
+        unsafe {
+            let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
+                              = mem::uninitialized();
+            (*self.compositor).WaitGetPoses.unwrap()(&mut tracked_poses[0], 
+                                                 constants::K_UNMAXTRACKEDDEVICECOUNT, 
+                                                 ptr::null_mut(), 0);
+        }
+    }
+
     fn submit_frame(&mut self, layer: &VRLayer) {
         // Lazy load the compositor
         if !self.ensure_compositor_initialized() {

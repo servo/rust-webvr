@@ -21,6 +21,10 @@ pub trait VRDevice: Send {
     // Resets the pose for this display
     fn reset_pose(&mut self);
 
+    // Synchronization point to keep in step with the HMD
+    // Must be called in the render thread, before doing any work
+    fn sync_poses(&mut self);
+
     // Submits frame to the display
     fn submit_frame(&mut self, layer: &VRLayer);
 }

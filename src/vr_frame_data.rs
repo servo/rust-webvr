@@ -1,3 +1,5 @@
+use VRPose;
+
 // Represents all the information needed to render a single frame of a VR scene
 #[derive(Debug, Clone)]
 pub struct VRFrameData {
@@ -16,6 +18,10 @@ pub struct VRFrameData {
 
     // major order column matrix describing the view transform to be used for the right eye’s rendering
     pub right_view_matrix: [f32; 16], 
+ 
+    // VRPose containing the future predicted pose of the VRDisplay
+    // when the current frame will be presented.
+    pub pose: VRPose,
 }
 
 impl Default for VRFrameData {
@@ -25,7 +31,8 @@ impl Default for VRFrameData {
             left_projection_matrix: identity_matrix!(),
             left_view_matrix: identity_matrix!(),
             right_projection_matrix: identity_matrix!(),
-            right_view_matrix: identity_matrix!()
+            right_view_matrix: identity_matrix!(),
+            pose: VRPose::default(),
         }
     }
 }

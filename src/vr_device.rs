@@ -15,10 +15,6 @@ pub trait VRDevice: Send {
     // Returns the current display data.
     fn get_display_data(&self) -> VRDisplayData;
 
-    // Returns a VRPose containing the future predicted pose of the VRDisplay
-    // when the current frame will be presented.
-    fn get_pose(&self) -> VRPose;
-
     // Returns the VRFrameData with the information required to render the current frame.
     fn get_frame_data(&self, near_z: f32, far_z: f32) -> VRFrameData;
 

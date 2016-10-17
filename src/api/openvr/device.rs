@@ -61,50 +61,10 @@ impl VRDevice for OpenVRDevice {
         data
     }
 
-    // Returns a VRPose containing the future predicted pose of the VRDisplay
-    // when the current frame will be presented.
-    fn get_pose(&self) -> VRPose {
-
-        let mut pose = VRPose::default();
-        let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
-                              = unsafe { mem::uninitialized() };
-        unsafe {
-            // Calculates updated poses for all devices
-            (*self.system).GetDeviceToAbsoluteTrackingPose.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated,
-                                                                    self.get_seconds_to_photons(),
-                                                                    &mut tracked_poses[0],
-                                                                    constants::K_UNMAXTRACKEDDEVICECOUNT);
-        };
-
-        let device_pose = &tracked_poses[self.index as usize];
-        if  device_pose.bPoseIsValid == 0 {
-            // For some reason the pose may not be valid, return a empty one
-            return pose;
-        }
-
-        // OpenVR returns a transformation matrix
-        // WebVR expects a quaternion, we have to decompose the transformation matrix
-        pose.orientation = Some(openvr_matrix_to_quat(&device_pose.mDeviceToAbsoluteTracking));
-
-        // Decompose position from transformation matrix
-        pose.position = Some(openvr_matrix_to_position(&device_pose.mDeviceToAbsoluteTracking));
-
-        // Copy linear velocity and angular velocity
-        pose.linear_velocity = Some([device_pose.vVelocity.v[0], 
-                                     device_pose.vVelocity.v[1], 
-                                     device_pose.vVelocity.v[2]]);
-        pose.angular_velocity = Some([device_pose.vAngularVelocity.v[0], 
-                                      device_pose.vAngularVelocity.v[1], 
-                                      device_pose.vAngularVelocity.v[2]]);
-
-        // TODO: OpenVR doesn't expose linear and angular acceleration
-        // Derive them from GetDeviceToAbsoluteTrackingPose with different predicted seconds_photons?
-        pose
-    }
-
     // Returns the VRFrameData with the information required to render the current frame.
     fn get_frame_data(&self, near_z: f32, far_z: f32) -> VRFrameData {
         let mut data = VRFrameData::default();
+        self.fetch_pose(&mut data.pose);
         self.fetch_projection_matrix(EVREye_Eye_Left, near_z, far_z, &mut data.left_projection_matrix);
         self.fetch_projection_matrix(EVREye_Eye_Right, near_z, far_z, &mut data.right_projection_matrix);
 
@@ -279,6 +239,43 @@ impl OpenVRDevice {
             (*self.system).GetEyeToHeadTransform.unwrap()(eye)
         };
         *out = openvr_matrix34_to_array(&matrix);
+    }
+
+    fn fetch_pose(&self, pose:&mut VRPose) {
+        let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
+                              = unsafe { mem::uninitialized() };
+        unsafe {
+            // Calculates updated poses for all devices
+            (*self.system).GetDeviceToAbsoluteTrackingPose.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated,
+                                                                    self.get_seconds_to_photons(),
+                                                                    &mut tracked_poses[0],
+                                                                    constants::K_UNMAXTRACKEDDEVICECOUNT);
+        };
+
+        let device_pose = &tracked_poses[self.index as usize];
+        if  device_pose.bPoseIsValid == 0 {
+            // For some reason the pose may not be valid, return a empty one
+            return;
+        }
+
+        // OpenVR returns a transformation matrix
+        // WebVR expects a quaternion, we have to decompose the transformation matrix
+        pose.orientation = Some(openvr_matrix_to_quat(&device_pose.mDeviceToAbsoluteTracking));
+
+        // Decompose position from transformation matrix
+        pose.position = Some(openvr_matrix_to_position(&device_pose.mDeviceToAbsoluteTracking));
+
+        // Copy linear velocity and angular velocity
+        pose.linear_velocity = Some([device_pose.vVelocity.v[0], 
+                                     device_pose.vVelocity.v[1], 
+                                     device_pose.vVelocity.v[2]]);
+        pose.angular_velocity = Some([device_pose.vAngularVelocity.v[0], 
+                                      device_pose.vAngularVelocity.v[1], 
+                                      device_pose.vAngularVelocity.v[2]]);
+
+        // TODO: OpenVR doesn't expose linear and angular acceleration
+        // Derive them from GetDeviceToAbsoluteTrackingPose with different predicted seconds_photons?
+
     }
 
     fn fetch_view_matrix(&self, out: &mut [f32; 16]) {

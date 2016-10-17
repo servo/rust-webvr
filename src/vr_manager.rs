@@ -41,12 +41,13 @@ impl VRServiceManager {
         }
 
         for service in &self.services {
-            match service.borrow_mut().initialize() {
+            let mut service = service.borrow_mut();
+            match service.initialize() {
                 Err(msg) => error!("Error initializing VRService: {:?}", msg),
                 _ => {
                     // Set event listener for the VRService
                     let this = self as *const Self;
-                    service.borrow_mut().set_observer(Some(Box::new(move |event| {
+                    service.set_observer(Some(Box::new(move |event| {
                         unsafe { 
                             (*this).notify_event(event);
                         }

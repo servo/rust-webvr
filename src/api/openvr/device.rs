@@ -216,12 +216,7 @@ impl OpenVRDevice {
         };
 
         data.stage_parameters = Some(VRStageParameters {
-            sitting_to_standing_transform: [
-                matrix.m[0][0], matrix.m[1][0], matrix.m[2][0], 0.0,
-                matrix.m[0][1], matrix.m[1][1], matrix.m[2][1], 0.0,
-                matrix.m[0][2], matrix.m[1][2], matrix.m[2][2], 0.0,
-                matrix.m[0][3], matrix.m[1][3], matrix.m[2][3], 1.0,
-            ],
+            sitting_to_standing_transform: openvr_matrix34_to_array(&matrix),
             size_x: size_x,
             size_y: size_y
         });
@@ -345,18 +340,18 @@ impl OpenVRDevice {
  
 #[inline]
 fn openvr_matrix34_to_array(matrix: &openvr::HmdMatrix34_t) -> [f32; 16] {
-    [matrix.m[0][0], matrix.m[0][1], matrix.m[0][2], matrix.m[0][3],
-     matrix.m[1][0], matrix.m[1][1], matrix.m[1][2], matrix.m[1][3],
-     matrix.m[2][0], matrix.m[2][1], matrix.m[2][2], matrix.m[2][3],
-     0.0, 0.0, 0.0, 1.0]
+    [matrix.m[0][0], matrix.m[1][0], matrix.m[2][0], 0.0,
+     matrix.m[0][1], matrix.m[1][1], matrix.m[2][1], 0.0,
+     matrix.m[0][2], matrix.m[1][2], matrix.m[2][2], 0.0,
+     matrix.m[0][3], matrix.m[1][3], matrix.m[2][3], 1.0]
 }
 
 #[inline]
 fn openvr_matrix44_to_array(matrix: &openvr::HmdMatrix44_t) -> [f32; 16] {
-    [matrix.m[0][0], matrix.m[0][1], matrix.m[0][2], matrix.m[0][3],
-     matrix.m[1][0], matrix.m[1][1], matrix.m[1][2], matrix.m[1][3],
-     matrix.m[2][0], matrix.m[2][1], matrix.m[2][2], matrix.m[2][3],
-     matrix.m[3][0], matrix.m[3][1], matrix.m[3][2], matrix.m[3][3]]
+    [matrix.m[0][0], matrix.m[1][0], matrix.m[2][0], matrix.m[3][0],
+     matrix.m[0][1], matrix.m[1][1], matrix.m[2][1], matrix.m[3][1],
+     matrix.m[0][2], matrix.m[1][2], matrix.m[2][2], matrix.m[3][2],
+     matrix.m[0][3], matrix.m[1][3], matrix.m[2][3], matrix.m[3][3]]
 }
 
 #[inline]
@@ -364,76 +359,30 @@ fn openvr_matrix_to_position(matrix: &openvr::HmdMatrix34_t) -> [f32; 3] {
     [matrix.m[0][3], matrix.m[1][3], matrix.m[2][3]]
 }
 
+// Adapted from http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
 #[inline]
 fn openvr_matrix_to_quat(matrix: &openvr::HmdMatrix34_t) -> [f32; 4] {
-    rot_matrix_to_quat(matrix.m[0][0], matrix.m[0][1], matrix.m[0][2],
-                       matrix.m[1][0], matrix.m[1][1], matrix.m[1][2],
-                       matrix.m[2][0], matrix.m[2][1], matrix.m[2][2])
+    let m = matrix.m;
+    let mut w = f32::max(0.0, 1.0 + m[0][0] + m[1][1] + m[2][2]).sqrt() * 0.5;
+    let mut x = f32::max(0.0, 1.0 + m[0][0] - m[1][1] - m[2][2]).sqrt() * 0.5;
+    let mut y = f32::max(0.0, 1.0 - m[0][0] + m[1][1] - m[2][2]).sqrt() * 0.5;
+    let mut z = f32::max(0.0, 1.0 - m[0][0] - m[1][1] + m[2][2]).sqrt() * 0.5;
+
+    x = copysign(x, m[1][2] - m[2][1]);
+    y = copysign(y, m[2][0] - m[0][2]);
+    z = copysign(z, m[0][1] - m[1][0]);
+
+    [w, x, y, z]
 }
 
-// Adapted from: http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
-fn rot_matrix_to_quat(mut m00:f32, mut m01:f32, mut m02:f32, mut m10:f32, mut m11:f32, 
-                      mut m12:f32, mut m20:f32, mut m21:f32, mut m22:f32) -> [f32; 4] {
-    let x;
-    let y; 
-    let z; 
-    let w;
 
-    //normalize transform
-    let mut len = m00 * m00 + m10 * m10 + m20 * m20;
-    if len != 1f32 && len != 0f32 {
-        len = 1f32 / len.sqrt();
-        m00 *= len;
-        m10 *= len;
-        m20 *= len;
-    }
-    len = m01 * m01 + m11 * m11 + m21 * m21;
-    if len != 1f32 && len != 0f32 {
-        len = 1f32 / len.sqrt();
-        m01 *= len;
-        m11 *= len;
-        m21 *= len;
-    }
-    len = m02 * m02 + m12 * m12 + m22 * m22;
-    if len != 1f32 && len != 0f32 {
-        len = 1f32 / len.sqrt();
-        m02 *= len;
-        m12 *= len;
-        m22 *= len;
-    }
-
-    // Decompose quaterion
-    let t = m00 + m11 + m22;
-    if t >= 0f32 { // |w| >= .5
-        let mut s = (t + 1f32).sqrt(); // |s|>=1 ...
-        w = 0.5f32 * s;
-        s = 0.5f32 / s; 
-        x = (m21 - m12) * s;
-        y = (m02 - m20) * s;
-        z = (m10 - m01) * s;
-    } else if (m00 > m11) && (m00 > m22) {
-        let mut s = (1f32 + m00 - m11 - m22).sqrt(); // |s|>=1
-        x = s * 0.5f32; // |x| >= .5
-        s = 0.5f32 / s;
-        y = (m10 + m01) * s;
-        z = (m02 + m20) * s;
-        w = (m21 - m12) * s;
-    } else if m11 > m22 {
-        let mut s = (1f32 + m11 - m00 - m22).sqrt(); // |s|>=1
-        y = s * 0.5f32; // |y| >= .5
-        s = 0.5f32 / s;
-        x = (m10 + m01) * s;
-        z = (m21 + m12) * s;
-        w = (m02 - m20) * s;
+#[inline]
+fn copysign(a: f32, b: f32) -> f32 {
+    if b == 0.0 {
+        0.0
     } else {
-        let mut s = (1f32 + m22 - m00 - m11).sqrt(); // |s|>=1
-        z = s * 0.5f32; // |z| >= .5
-        s = 0.5f32 / s;
-        x = (m02 + m20) * s;
-        y = (m21 + m12) * s;
-        w = (m10 - m01) * s;
+        a.abs() * b.signum()
     }
-    [x, y, z, w]
 }
 
 fn texture_bounds_to_openvr(bounds: &[f32; 4]) -> openvr::VRTextureBounds_t {

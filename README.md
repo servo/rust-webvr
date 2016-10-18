@@ -1,11 +1,11 @@
 # rust-webvr
-WebVR API implementation for servo. 
+WebVR Core API implementation for servo. We're working on integrating this core module into the Servo browser architecture.
 
-More documentation soon
+This module can be tested outside of Servo and even be used as a simple to use VR API on any Rust standalone app which uses native Rust code and native OpenGL calls. It contains a full working OpenVR implementation.
 
-#How to run the WebVR API Room Scale demo
+## Room Scale example: 
 
-Run this command in the main folder
+Just run this command in the main folder
 
 ```
 cargo run --example room

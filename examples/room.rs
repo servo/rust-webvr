@@ -13,7 +13,7 @@ use std::mem;
 use std::path::Path;
 use std::env;
 
-use webvr::{VRServiceManager, VRDevice, VRLayer, VRFrameData};
+use webvr::{VRServiceManager, VRLayer, VRFrameData};
 
 #[derive(Copy, Clone)]
 struct Vertex {

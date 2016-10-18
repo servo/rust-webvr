@@ -1,8 +1,10 @@
 use VRDevicePtr;
 use VRServicePtr;
 use VRDisplayEvent;
-use api::openvr::service::OpenVRService;
 use std::collections::HashMap;
+
+#[cfg(feature = "openvr")]
+use api::openvr::service::OpenVRService;
 
 // Single entry point all the VRServices and devices
 pub struct VRServiceManager {
@@ -25,8 +27,14 @@ impl VRServiceManager {
 
     // Register default VR services specified in crate's features
     pub fn register_default(&mut self) {
-        // TODO: add feature macro
-        self.register(OpenVRService::new());
+
+        let services: Vec<VRServicePtr> = vec!(
+            #[cfg(feature = "openvr")] OpenVRService::new()
+        );
+        
+        for service in &services {
+            self.register(service.clone());
+        }
     }
 
     // Register a new VR service

@@ -70,17 +70,9 @@ impl VRDevice for OpenVRDevice {
 
         let mut view_matrix: [f32; 16] = unsafe { mem::uninitialized() };
         self.fetch_view_matrix(&mut view_matrix);
-
-        // Todo:: Check if WebVR spects only the eye to head matrix or HDM orientation too.
-        // View matrix must by multiplied by each eye_to_head transformation matrix
-        // let mut left_eye:[f32; 16] = unsafe { mem::uninitialized() };
-        // let mut right_eye:[f32; 16] = unsafe { mem::uninitialized() };
-        
         self.fetch_eye_to_head_matrix(EVREye_Eye_Left, &mut data.left_view_matrix);
         self.fetch_eye_to_head_matrix(EVREye_Eye_Right, &mut data.right_view_matrix);
 
-        //utils::multiply_matrix(&left_eye, &view_matrix, &mut data.left_view_matrix);
-        //utils::multiply_matrix(&right_eye, &view_matrix, &mut data.right_view_matrix);
         data
     }
 

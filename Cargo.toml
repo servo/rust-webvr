@@ -3,12 +3,16 @@ name = "webvr"
 version = "0.1.0"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
+[features]
+default = ["openvr"]
+openvr = ["openvr_sys"]
+
 [dependencies]
 log  = "0.3"
-openvr_sys = "1.0.2"
+openvr_sys = { version = "1.0.2", optional = true }
 
 [dev-dependencies]
-# Dependencies required tu run the examples
+# Only required to run examples
 glium = "0.15"
 cgmath = "0.12"
 image = "0.10"

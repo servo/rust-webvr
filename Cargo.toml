@@ -4,8 +4,9 @@ version = "0.1.0"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 [features]
-default = ["openvr"]
+default = ["openvr", "mock"]
 openvr = ["openvr_sys"]
+mock = []
 
 [dependencies]
 log  = "0.3"

@@ -12,7 +12,6 @@ use std::ptr;
 use std::cell::RefCell;
 use std::mem;
 
-
 pub struct OpenVRService {
     initialized: bool,
     devices: Vec<OpenVRDevicePtr>,
@@ -28,7 +27,7 @@ impl VRService for OpenVRService {
             return Ok(());
         }
         if !self.is_available() {
-            return Err("Not available".to_string());
+            return Err("Not available".into());
         }
 
         let mut error = EVRInitError_VRInitError_None;

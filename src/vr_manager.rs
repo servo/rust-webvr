@@ -6,6 +6,9 @@ use std::collections::HashMap;
 #[cfg(feature = "openvr")]
 use api::openvr::service::OpenVRService;
 
+#[cfg(feature = "mock")]
+use api::mock::service::MockVRService;
+
 // Single entry point all the VRServices and devices
 pub struct VRServiceManager {
     initialized: bool,
@@ -26,7 +29,7 @@ impl VRServiceManager {
     }
 
     // Register default VR services specified in crate's features
-    pub fn register_default(&mut self) {
+    pub fn register_defaults(&mut self) {
 
         let services: Vec<VRServicePtr> = vec!(
             #[cfg(feature = "openvr")] OpenVRService::new()
@@ -36,6 +39,14 @@ impl VRServiceManager {
             self.register(service.clone());
         }
     }
+
+    // Register mock VR Service
+    // Usefull for testing
+    #[cfg(feature = "mock")]
+    pub fn register_mock(&mut self) {
+        self.register(MockVRService::new());
+    }
+
 
     // Register a new VR service
     pub fn register(&mut self, service: VRServicePtr) {
@@ -72,6 +83,8 @@ impl VRServiceManager {
         for (_, device) in &self.devices {
             result.push(device.clone());
         }
+        // Sort by device_id to match service initialization order
+        result.sort_by(|a, b| a.borrow().device_id().cmp(&b.borrow().device_id()));
         result
     }
 

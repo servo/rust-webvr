@@ -137,7 +137,7 @@ impl OpenVRDevice {
                 String::from(str::from_utf8(slice::from_raw_parts(ptr, size as usize)).unwrap_or(""))
             }
         } else {
-            "".to_string()
+            "".into()
         }
     }
 

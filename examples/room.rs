@@ -11,7 +11,6 @@ use glium::texture::SrgbTexture2d;
 use std::f32::consts::PI;
 use std::mem;
 use std::path::Path;
-use std::env;
 
 use webvr::{VRServiceManager, VRLayer, VRFrameData};
 
@@ -132,41 +131,56 @@ impl<'a> Mesh<'a> {
         }
     }
 
-    // TODO:: fix this method
     #[allow(dead_code)]
-    fn new_sphere(ctx: &GlutinFacade, tex:&'a Tex, radius: f32, pos:[f32;3]) -> Mesh<'a> {
-        const SECTORS: usize = 40;
-        const RINGS: usize = 40;
+    fn new_sphere(ctx: &GlutinFacade, tex:&'a Tex, radius: f32, pos:[f32;3], rot:[f32;3]) -> Mesh<'a> {
 
-        let dr = 1.0/(RINGS as f32 - 1.0);
-        let ds = 1.0/(SECTORS as f32 - 1.0);
+        let sw = 80; // width segments
+        let sh = 60; // heieght segments
 
-        let mut vertices = [Vertex::empty(); RINGS * SECTORS * 3];
-        let mut indices = [0u16; RINGS * SECTORS * 4];
+        let phi_start = 0.0;
+        let phi_len = PI * 2.0;
+        let theta_start = 0.0;
+        let theta_len = PI;
+        let theta_end = theta_start + theta_len;
 
-        for r in 0..RINGS {
-            for s in 0..SECTORS {
-                let y = (-PI * 0.5 + PI * r as f32 * dr).sin();
-                let x = (2.0 * PI * s as f32 * ds).cos() * (PI * r as f32 * dr).sin();
-                let z = (2.0 * PI * s as f32 * ds).sin() * (PI * r as f32 * dr).sin();
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
 
-                vertices[r * SECTORS + s] = Vertex {
-                    position: [x * radius, y * radius, z * radius],
-                    uv: [s as f32 * ds, r as f32 * dr]
-                };
+        for y in 0..sh + 1 {
+            let v = y as f32 / sh as f32;
+            for x in 0..sw + 1 {
+                let u = x as f32/ sw as f32;
+
+                let mut vertex = Vertex::empty();
+                vertex.position = [
+                    -radius * (phi_start + u * phi_len).cos() * (theta_start + v * theta_len).sin(),
+                    radius * (phi_start + u * phi_len).sin() * (theta_start + v * theta_len).sin(),
+                    radius * (theta_start + v * theta_len).cos(),
+                ];
+                vertex.uv = [u, 1.0 - v];
+
+                vertices.push(vertex);
+
+                // Add indices
+                if y != 0 || theta_start > 0.0 {
+                    indices.push((y * sw + x + 1) as u16);
+                    indices.push((y * sw + x) as u16);
+                    indices.push(((y + 1) * sw + x + 1) as u16);
+                }
+                if y != sh -1 || theta_end < PI {
+                    indices.push((y * sw + x) as u16);
+                    indices.push(((y + 1) * sw + x) as u16);
+                    indices.push(((y + 1) * sw + x + 1) as u16);
+                }
+                            
             }
-        };
+        }
 
-        for r in 0..RINGS - 1 {
-            for s in 0..SECTORS -1 {
-                indices[r * SECTORS + s * 4] = (r * SECTORS + s) as u16;
-                indices[r * SECTORS + s * 4 + 1] = (r * SECTORS + s + 1) as u16;
-                indices[r * SECTORS + s * 4 + 2] = ((r + 1) * SECTORS + s + 1) as u16;
-                indices[r * SECTORS + s * 4 + 3] = ((r + 1) * SECTORS + s) as u16;
-            }
-        };
 
-        let matrix = Matrix4::from_translation(Vec3::new(pos[0], pos[1], pos[2]));
+        let rotation = Matrix4::from(Euler { x: Rad(rot[0]), y: Rad(rot[1]), z: Rad(rot[2]) });
+        let translation = Matrix4::from_translation(Vec3::new(pos[0], pos[1], pos[2]));
+        let scale = Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
+        let matrix = translation * scale * rotation;
 
         Mesh {
             vertex_buffer: glium::VertexBuffer::new(ctx, &vertices).unwrap(),
@@ -225,10 +239,16 @@ fn vec_to_translation(raw: &[f32; 3]) -> Mat4 {
 pub fn main() {
      // Initialize VR Services
     let mut vr = VRServiceManager::new();
-    // Register default VRService implementations and initialize them
-    vr.register_default();
+    // Register default VRService implementations and initialize them.
+    // Default VRServices are specified using cargo features.
+    vr.register_defaults();
+    // Add a mock service to allow running the demo when no VR Device is available.
+    // If no VR service is found the demo fallbacks to the Mock.
+    vr.register_mock();
+    // Intialize all registered VR Services
     vr.initialize_services();
 
+    // Get found VR devices
     let devices = vr.get_devices();
 
     if devices.len() > 0 {
@@ -251,7 +271,6 @@ pub fn main() {
     let window_width = render_width;
     let window_height = (render_height as f32 * 0.5) as u32;
 
-
     let near = 0.1f32;
     let far = 1000.0f32;
     // Virtual room size
@@ -266,8 +285,7 @@ pub fn main() {
     let c = load_texture(&ctx, "floor.jpg");
     let floor_tex = load_texture(&ctx, "floor.jpg");
     let wall_tex = load_texture(&ctx, "wall.jpg");
-    let roof_tex = load_texture(&ctx, "roof.jpg");
-    // let sky_tex = load_sky_texture(&ctx);
+    let sky_tex = load_texture(&ctx, "sky.jpg");
     println!("Textures loaded!");
 
     // texture to be used as a framebuffer
@@ -276,15 +294,13 @@ pub fn main() {
     let prog_fb = glium::Program::from_source(&ctx, VERTEX_SHADER_FB, FRAGMENT_SHADER2, None).unwrap();
 
     let mut meshes = Vec::new();
-    // TODO:: fix skybox
-    //meshes.push(Mesh::new_sphere(&ctx, &sky_tex, 20.0, [0.0, 0.0, 0.0]));
+    // Sky sphere
+    meshes.push(Mesh::new_sphere(&ctx, &sky_tex, 50.0, [0.0, 0.0, 0.0], [0.0, PI, 0.0]));
     // floor
     meshes.push(Mesh::new_plane(&ctx, &floor_tex, [width,depth], [0.0, 0.0, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0]));
-    // ceill
-    meshes.push(Mesh::new_plane(&ctx, &roof_tex, [width,depth], [0.0, height, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0]));
     // walls
     meshes.push(Mesh::new_plane(&ctx, &wall_tex, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0]));
-    meshes.push(Mesh::new_plane(&ctx, &wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0]));
+    meshes.push(Mesh::new_plane(&ctx, &wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0]));
     meshes.push(Mesh::new_plane(&ctx, &wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0]));
     meshes.push(Mesh::new_plane(&ctx, &wall_tex, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [-1.0,1.0,1.0]));
 
@@ -329,7 +345,7 @@ pub fn main() {
         let device_data = device.borrow().get_display_data();
         if let Some(ref stage) = device_data.stage_parameters {
             // TODO: use event queue instead of checking this every frame
-            standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
+            standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap();
         }
 
         let mut target = ctx.draw();
@@ -393,10 +409,9 @@ pub fn main() {
 
         for event in ctx.poll_events() {
             match event {
-                glium::glutin::Event::Closed => break,
+                glium::glutin::Event::Closed => return,
                 _ => {}
             }
         }
-
     }
 }

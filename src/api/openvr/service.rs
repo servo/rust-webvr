@@ -149,6 +149,17 @@ impl VRService for OpenVRService {
     }
 }
 
+impl Drop for OpenVRService {
+    fn drop(&mut self) {
+        if self.initialized {
+            unsafe {
+                debug!("OpenVR Shutdown");
+                openvr::VR_ShutdownInternal();
+            }
+        }
+    }
+}
+
 impl OpenVRService {
     pub fn new() -> VRServicePtr {
         Arc::new(RefCell::new(OpenVRService {

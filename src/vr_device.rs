@@ -15,7 +15,7 @@ pub trait VRDevice: Send {
     fn get_display_data(&self) -> VRDisplayData;
 
     // Returns the VRFrameData with the information required to render the current frame.
-    fn get_frame_data(&self, near_z: f32, far_z: f32) -> VRFrameData;
+    fn get_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData;
 
     // Resets the pose for this display
     fn reset_pose(&mut self);

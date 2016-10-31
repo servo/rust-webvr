@@ -62,7 +62,9 @@ impl VRDevice for OpenVRDevice {
     }
 
     // Returns the VRFrameData with the information required to render the current frame.
-    fn get_frame_data(&self, near_z: f32, far_z: f32) -> VRFrameData {
+    fn get_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
+        let near_z = near_z as f32;
+        let far_z = far_z as f32;
         let mut data = VRFrameData::default();
         self.fetch_pose(&mut data.pose);
         self.fetch_projection_matrix(EVREye_Eye_Left, near_z, far_z, &mut data.left_projection_matrix);

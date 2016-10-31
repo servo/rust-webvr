@@ -63,7 +63,7 @@ impl VRDevice for MockVRDevice {
         data
     }
 
-    fn get_frame_data(&self, _near_z: f32, _far_z: f32) -> VRFrameData {
+    fn get_frame_data(&self, _near_z: f64, _far_z: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
         // Position vector
         data.pose.position = Some([0.5, -0.7, -0.3]);

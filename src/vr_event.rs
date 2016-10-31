@@ -1,5 +1,7 @@
 use VRDisplayData;
 
+#[allow(unused_attributes)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum VRDisplayEventReason {
     Navigation,
     // The VRDisplay has detected that the user has put it on.
@@ -9,6 +11,8 @@ pub enum VRDisplayEventReason {
     Unmounted
 }
 
+#[allow(unused_attributes)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum VRDisplayEvent {
     // Indicates that a VRDisplay has been connected.
     Connect(VRDisplayData),

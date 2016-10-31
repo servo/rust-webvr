@@ -2,7 +2,8 @@ use VRDisplayCapabilities;
 use VREyeParameters;
 use VRStageParameters;
 
-#[derive(Debug, Clone)]
+#[allow(unused_attributes)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VRDisplayData {
     pub display_id: u64,
     pub display_name: String,

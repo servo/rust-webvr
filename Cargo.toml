@@ -7,9 +7,12 @@ authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 default = ["openvr", "mock"]
 openvr = ["openvr_sys"]
 mock = []
+serde-serialization = ["serde", "serde_derive"]
 
 [dependencies]
 log  = "0.3"
+serde = { version = "0.8", optional = true }
+serde_derive = { version = "0.8", optional = true }
 openvr_sys = { version = "1.0.2", optional = true }
 
 [dev-dependencies]

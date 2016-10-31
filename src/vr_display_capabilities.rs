@@ -1,5 +1,6 @@
 // describes the capabilities of a VRDisplay. These are expected to be static per-device/per-user.
-#[derive(Debug, Clone)]
+#[allow(unused_attributes)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VRDisplayCapabilities {
     // true if the VRDisplay is capable of tracking its position.
     pub has_position: bool,

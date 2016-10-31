@@ -1,7 +1,8 @@
 use VRPose;
 
 // Represents all the information needed to render a single frame of a VR scene
-#[derive(Debug, Clone)]
+#[allow(unused_attributes)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VRFrameData {
     // Monotonically increasing value that allows the author 
     // to determine if position state data been updated from the hardware

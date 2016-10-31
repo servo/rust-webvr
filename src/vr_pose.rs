@@ -1,5 +1,6 @@
 // The VRPose struct represents a sensor’s state at a given timestamp.
-#[derive(Debug, Clone, Copy, Default)]
+#[allow(unused_attributes)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
 pub struct VRPose {
     // Position of the VRDisplay as a 3D vector.
     // May be None if the sensor is incapable of providing positional data.

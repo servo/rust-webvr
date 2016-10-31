@@ -1,7 +1,20 @@
+#![feature(custom_attribute)]
+#![feature(custom_derive)]
+#![cfg_attr(feature = "serde-serialization", feature(proc_macro))]
+
+
 #[macro_use]
 macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);
 }
+
+#[macro_use]
+extern crate log;
+#[cfg(feature = "serde-serialization")]
+extern crate serde;
+#[cfg(feature = "serde-serialization")]
+#[macro_use]
+extern crate serde_derive;
 
 pub mod vr_device;
 pub mod vr_service;
@@ -32,6 +45,3 @@ pub use vr_event::{VRDisplayEvent, VRDisplayEventReason};
 pub use vr_field_view::VRFieldOfView;
 
 pub mod api;
-
-#[macro_use]
-extern crate log;

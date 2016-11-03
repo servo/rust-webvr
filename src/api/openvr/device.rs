@@ -72,8 +72,22 @@ impl VRDevice for OpenVRDevice {
 
         let mut view_matrix: [f32; 16] = unsafe { mem::uninitialized() };
         self.fetch_view_matrix(&mut view_matrix);
-        self.fetch_eye_to_head_matrix(EVREye_Eye_Left, &mut data.left_view_matrix);
-        self.fetch_eye_to_head_matrix(EVREye_Eye_Right, &mut data.right_view_matrix);
+
+        let mut left_eye:[f32; 16] = unsafe { mem::uninitialized() };
+        let mut right_eye:[f32; 16] = unsafe { mem::uninitialized() };
+        
+        // Fech the transform of each eye
+        self.fetch_eye_to_head_matrix(EVREye_Eye_Left, &mut left_eye);
+        self.fetch_eye_to_head_matrix(EVREye_Eye_Right, &mut right_eye);
+
+        // View matrix must by multiplied by each eye_to_head transformation matrix
+        utils::multiply_matrix(&view_matrix, &left_eye, &mut data.left_view_matrix);
+        utils::multiply_matrix(&view_matrix, &right_eye, &mut data.right_view_matrix);
+        // Invert matrices
+        utils::inverse_matrix(&data.left_view_matrix, &mut view_matrix);
+        data.left_view_matrix = view_matrix;
+        utils::inverse_matrix(&data.right_view_matrix, &mut view_matrix);
+        data.right_view_matrix = view_matrix;
 
         data
     }

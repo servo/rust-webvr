@@ -271,8 +271,8 @@ pub fn main() {
     let window_width = render_width;
     let window_height = (render_height as f32 * 0.5) as u32;
 
-    let near = 0.1f32;
-    let far = 1000.0f32;
+    let near = 0.1f64;
+    let far = 1000.0f64;
     // Virtual room size
     let width = 5f32;
     let height = 3.0f32;
@@ -354,6 +354,7 @@ pub fn main() {
         let data: VRFrameData = device.borrow().get_frame_data(near, far);
 
         // Calculate view transform based on pose data
+        // We can also use data.left_view_matrix instead, we use Pose for testing purposes
         let quaternion = data.pose.orientation.unwrap_or([0.0, 0.0, 0.0, 1.0]);
         let rotation_transform = Mat4::from(vec_to_quaternion(&quaternion));
         let position_transform = match data.pose.position {
@@ -362,16 +363,18 @@ pub fn main() {
         };
         
         let view = rotation_transform * position_transform * standing_transform;
+        let left_eye_to_head = vec_to_translation(&device_data.left_eye_parameters.offset).inverse_transform().unwrap();
+        let right_eye_to_head = vec_to_translation(&device_data.right_eye_parameters.offset).inverse_transform().unwrap();
 
         // render per eye to the FBO
         let eyes =  [
-            (&left_viewport, &data.left_projection_matrix, &data.left_view_matrix),
-            (&right_viewport, &data.right_projection_matrix, &data.right_view_matrix),
+            (&left_viewport, &data.left_projection_matrix, &left_eye_to_head),
+            (&right_viewport, &data.right_projection_matrix, &right_eye_to_head)
         ];
 
         for eye in &eyes {
             render_params.viewport = Some(*eye.0);
-            let eye_view = view * vec_to_matrix(eye.2) ;
+            let eye_view = view * eye.2;
             let projection = vec_to_matrix(eye.1);
 
             for mesh in &meshes {

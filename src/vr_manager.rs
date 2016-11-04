@@ -1,7 +1,7 @@
-use VRDevicePtr;
-use VRServicePtr;
-use VRDisplayEvent;
 use std::collections::HashMap;
+use VRDevicePtr;
+use VRDisplayEvent;
+use VRServicePtr;
 
 #[cfg(feature = "openvr")]
 use api::openvr::service::OpenVRService;
@@ -13,8 +13,7 @@ use api::mock::service::MockVRService;
 pub struct VRServiceManager {
     initialized: bool,
     services: Vec<VRServicePtr>,
-    devices: HashMap<u64, VRDevicePtr>,
-    observer: Option<Box<Fn(VRDisplayEvent)>>
+    devices: HashMap<u64, VRDevicePtr>
 }
 
 impl VRServiceManager {
@@ -23,8 +22,7 @@ impl VRServiceManager {
         VRServiceManager {
             initialized: false,
             services: Vec::new(),
-            devices: HashMap::new(),
-            observer: None
+            devices: HashMap::new()
         }
     }
 
@@ -61,18 +59,9 @@ impl VRServiceManager {
 
         for service in &self.services {
             let mut service = service.borrow_mut();
-            match service.initialize() {
-                Err(msg) => error!("Error initializing VRService: {:?}", msg),
-                _ => {
-                    // Set event listener for the VRService
-                    let this = self as *const Self;
-                    service.set_observer(Some(Box::new(move |event| {
-                        unsafe { 
-                            (*this).notify_event(event);
-                        }
-                    })));
-                }
-            };
+            if let Err(msg) = service.initialize() {
+                error!("Error initializing VRService: {:?}", msg);
+            }
         }
         self.initialized  = true;
     }
@@ -92,9 +81,12 @@ impl VRServiceManager {
         self.devices.get(&device_id)
     }
 
-    // sets the global VRDisplay Event observer 
-    pub fn set_observer(&mut self, callback: Option<Box<Fn(VRDisplayEvent)>>) {
-        self.observer = callback;
+    pub fn poll_events(&self) -> Vec<VRDisplayEvent> {
+        let mut events = Vec::new();
+        for service in &self.services {
+            events.append(&mut service.borrow().poll_events());
+        }
+        events
     }
 }
 
@@ -112,12 +104,6 @@ impl VRServiceManager {
                     }
                 }
             }
-        }
-    }
-
-    fn notify_event(&self, event: VRDisplayEvent) {
-        if let Some(ref observer) = self.observer {
-            observer(event);
         }
     }
 }

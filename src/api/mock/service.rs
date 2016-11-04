@@ -5,7 +5,6 @@ use std::cell::RefCell;
 
 pub struct MockVRService {
     devices: Vec<MockVRDevicePtr>,
-    observer: Option<Box<Fn(VRDisplayEvent)>>
 }
 
 unsafe impl Send for MockVRService {}
@@ -27,12 +26,9 @@ impl VRService for MockVRService {
         true   
     }
 
-    fn poll_events(&self) {
+    fn poll_events(&self) -> Vec<VRDisplayEvent> {
         // TODO: fake mock events
-    }
-
-    fn set_observer(&mut self, callback: Option<Box<Fn(VRDisplayEvent)>>) {
-        self.observer = callback;
+        Vec::new()
     }
 }
 
@@ -40,7 +36,6 @@ impl MockVRService {
     pub fn new() -> VRServicePtr {
         Arc::new(RefCell::new(MockVRService {
             devices: Vec::new(),
-            observer: None
         }))
     }
     fn clone_devices(&self) -> Vec<VRDevicePtr> {

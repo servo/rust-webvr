@@ -11,7 +11,5 @@ pub trait VRService: Send {
 
     fn is_available(&self) -> bool;
 
-    fn poll_events(&self);
-
-    fn set_observer(&mut self, callback: Option<Box<Fn(VRDisplayEvent)>>);
+    fn poll_events(&self) -> Vec<VRDisplayEvent>;
 }

@@ -16,7 +16,6 @@ pub struct OpenVRService {
     initialized: bool,
     devices: Vec<OpenVRDevicePtr>,
     system: *mut openvr::VR_IVRSystem_FnTable,
-    observer: Option<Box<Fn(VRDisplayEvent)>>
 }
 
 unsafe impl Send for OpenVRService {}
@@ -90,7 +89,8 @@ impl VRService for OpenVRService {
         }
     }
 
-    fn poll_events(&self) {
+    fn poll_events(&self) -> Vec<VRDisplayEvent> {
+        let mut result = Vec::new();
         let mut event: openvr::VREvent_t = unsafe { mem::uninitialized() };
         let size = mem::size_of::<openvr::VREvent_t>() as u32;
         while unsafe { (*self.system).PollNextEvent.unwrap()(&mut event, size) } != 0 {
@@ -101,51 +101,49 @@ impl VRService for OpenVRService {
                 EVREventType_VREvent_TrackedDeviceUserInteractionStarted => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
     
-                        self.notify_event(VRDisplayEvent::Activate(device.borrow().get_display_data(), 
+                        result.push(VRDisplayEvent::Activate(device.borrow().get_display_data(), 
                                                                    VRDisplayEventReason::Mounted));
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceUserInteractionEnded => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
     
-                        self.notify_event(VRDisplayEvent::Deactivate(device.borrow().get_display_data(), 
+                        result.push(VRDisplayEvent::Deactivate(device.borrow().get_display_data(), 
                                                                      VRDisplayEventReason::Unmounted));
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceActivated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        self.notify_event(VRDisplayEvent::Connect(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Connect(device.borrow().get_display_data()))
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceDeactivated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        self.notify_event(VRDisplayEvent::Disconnect(device.borrow().device_id()))
+                        result.push(VRDisplayEvent::Disconnect(device.borrow().device_id()))
                     }
                 },
                 EVREventType_VREvent_DashboardActivated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        self.notify_event(VRDisplayEvent::Blur(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Blur(device.borrow().get_display_data()))
                     }
                 },
                 EVREventType_VREvent_DashboardDeactivated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        self.notify_event(VRDisplayEvent::Focus(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Focus(device.borrow().get_display_data()))
                     }
                 },
                 EVREventType_VREvent_ChaperoneDataHasChanged |
                 EVREventType_VREvent_IpdChanged |
                 EVREventType_VREvent_TrackedDeviceUpdated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        self.notify_event(VRDisplayEvent::Change(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Change(device.borrow().get_display_data()))
                     }
                 },
                 _ => {}
             };
-        } 
-    }
-
-    fn set_observer(&mut self, callback: Option<Box<Fn(VRDisplayEvent)>>) {
-        self.observer = callback;
+        }
+        
+        result
     }
 }
 
@@ -166,7 +164,6 @@ impl OpenVRService {
             initialized: false,
             devices: Vec::new(),
             system: ptr::null_mut(),
-            observer: None
         }))
     }
     fn clone_devices(&self) -> Vec<VRDevicePtr> {
@@ -175,11 +172,5 @@ impl OpenVRService {
 
     pub fn get_device(&self, index: openvr::TrackedDeviceIndex_t) -> Option<&OpenVRDevicePtr> {
         self.devices.iter().find(|&d| d.borrow().index() == index)
-    }
-
-    fn notify_event(&self, event: VRDisplayEvent) {
-        if let Some(ref observer) = self.observer {
-            observer(event);
-        }
     }
 }

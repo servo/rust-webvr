@@ -337,10 +337,10 @@ pub fn main() {
     };
 
     let mut framebuffer = target_texture.as_surface();
+    let mut event_counter = 0u64;
 
     loop {
         device.borrow_mut().sync_poses();
-
 
         let device_data = device.borrow().get_display_data();
         if let Some(ref stage) = device_data.stage_parameters {
@@ -409,6 +409,14 @@ pub fn main() {
 
 
         assert_no_gl_error!(ctx);
+
+        // We don't need to poll VR headset events every frame
+        event_counter += 1;
+        if event_counter % 100 == 0 {
+            for event in vr.poll_events() {
+                println!("VR Event: {:?}", event);
+            }
+        }
 
         for event in ctx.poll_events() {
             match event {

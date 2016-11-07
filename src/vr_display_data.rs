@@ -7,6 +7,7 @@ use VRStageParameters;
 pub struct VRDisplayData {
     pub display_id: u64,
     pub display_name: String,
+    pub connected: bool,
     pub capabilities: VRDisplayCapabilities,
     pub stage_parameters: Option<VRStageParameters>,
     pub left_eye_parameters: VREyeParameters,
@@ -18,6 +19,7 @@ impl Default for VRDisplayData {
          VRDisplayData {
             display_id: 0,
             display_name: String::new(),
+            connected: false,
             capabilities: VRDisplayCapabilities::default(),
             stage_parameters: None,
             left_eye_parameters: VREyeParameters::default(),

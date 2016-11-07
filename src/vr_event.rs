@@ -37,5 +37,5 @@ pub enum VRDisplayEvent {
     Focus(VRDisplayData),
 
     // Indicates that a VRDisplay has begun or ended VR presentation
-    PresentChange(VRDisplayData)
+    PresentChange(VRDisplayData, bool)
 }

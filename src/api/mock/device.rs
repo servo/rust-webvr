@@ -31,6 +31,7 @@ impl VRDevice for MockVRDevice {
 
         data.display_name = "Mock VR Device".into();
         data.display_id = self.device_id;
+        data.connected = true;
 
         data.capabilities.can_present = true;
         data.capabilities.has_orientation = true;

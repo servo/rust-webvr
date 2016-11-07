@@ -56,7 +56,7 @@ impl VRDevice for OpenVRDevice {
         data.display_name = format!("{} {}",
                             self.get_string_property(ETrackedDeviceProperty_Prop_ManufacturerName_String),
                             self.get_string_property(ETrackedDeviceProperty_Prop_ModelNumber_String));
-
+        data.connected = self.is_connected();
 
         data
     }
@@ -187,6 +187,12 @@ impl OpenVRDevice {
         fov.right_degrees = right.atan().to_degrees() as f64;
         fov.down_degrees = down.atan().to_degrees() as f64;
         fov.left_degrees = -left.atan().to_degrees() as f64;
+    }
+
+    fn is_connected(&self) -> bool {
+        unsafe {
+            (*self.system).IsTrackedDeviceConnected.unwrap()(self.index) != 0
+        }
     }
 
     fn fetch_eye_parameters(&self, left: &mut VREyeParameters, right: &mut VREyeParameters) {

@@ -88,6 +88,10 @@ impl VRServiceManager {
         }
         events
     }
+
+    pub fn is_initialized(&self) -> bool {
+        self.initialized
+    }
 }
 
 impl VRServiceManager {

@@ -91,6 +91,9 @@ impl VRService for OpenVRService {
 
     fn poll_events(&self) -> Vec<VRDisplayEvent> {
         let mut result = Vec::new();
+        if !self.initialized || self.system.is_null() {
+            return result;
+        }
         let mut event: openvr::VREvent_t = unsafe { mem::uninitialized() };
         let size = mem::size_of::<openvr::VREvent_t>() as u32;
         while unsafe { (*self.system).PollNextEvent.unwrap()(&mut event, size) } != 0 {

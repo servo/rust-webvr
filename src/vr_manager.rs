@@ -1,18 +1,21 @@
 use std::collections::HashMap;
 use VRDevicePtr;
+use VRDeviceType;
 use VRDisplayEvent;
-use VRServicePtr;
+use VRService;
+use VRServiceCreator;
+use VRCompositor;
 
 #[cfg(feature = "openvr")]
-use api::openvr::service::OpenVRService;
+use api::OpenVRServiceCreator;
 
 #[cfg(feature = "mock")]
-use api::mock::service::MockVRService;
+use api::MockServiceCreator;
 
 // Single entry point all the VRServices and devices
 pub struct VRServiceManager {
     initialized: bool,
-    services: Vec<VRServicePtr>,
+    services: Vec<Box<VRService>>,
     devices: HashMap<u64, VRDevicePtr>
 }
 
@@ -28,13 +31,12 @@ impl VRServiceManager {
 
     // Register default VR services specified in crate's features
     pub fn register_defaults(&mut self) {
-
-        let services: Vec<VRServicePtr> = vec!(
-            #[cfg(feature = "openvr")] OpenVRService::new()
+        let creators: Vec<Box<VRServiceCreator>> = vec!(
+            #[cfg(feature = "openvr")] OpenVRServiceCreator::new()
         );
         
-        for service in &services {
-            self.register(service.clone());
+        for creator in &creators {
+            self.register(creator.new_service());
         }
     }
 
@@ -42,13 +44,14 @@ impl VRServiceManager {
     // Usefull for testing
     #[cfg(feature = "mock")]
     pub fn register_mock(&mut self) {
-        self.register(MockVRService::new());
+        let creator = MockServiceCreator::new();
+        self.register(creator.new_service());
     }
 
 
     // Register a new VR service
-    pub fn register(&mut self, service: VRServicePtr) {
-        self.services.push(service.clone());
+    pub fn register(&mut self, service: Box<VRService>) {
+        self.services.push(service);
     }
     
     // Initializes all the services
@@ -57,8 +60,7 @@ impl VRServiceManager {
             return;
         }
 
-        for service in &self.services {
-            let mut service = service.borrow_mut();
+        for service in &mut self.services {
             if let Err(msg) = service.initialize() {
                 error!("Error initializing VRService: {:?}", msg);
             }
@@ -81,10 +83,10 @@ impl VRServiceManager {
         self.devices.get(&device_id)
     }
 
-    pub fn poll_events(&self) -> Vec<VRDisplayEvent> {
+    pub fn poll_events(&mut self) -> Vec<VRDisplayEvent> {
         let mut events = Vec::new();
-        for service in &self.services {
-            events.append(&mut service.borrow().poll_events());
+        for service in &mut self.services {
+            events.append(&mut service.poll_events());
         }
         events
     }
@@ -92,14 +94,30 @@ impl VRServiceManager {
     pub fn is_initialized(&self) -> bool {
         self.initialized
     }
+
+    pub fn create_compositor(device_type: VRDeviceType) -> Result<Box<VRCompositor>, String> {
+
+        let creators: Vec<(VRDeviceType, Box<VRServiceCreator>)> = vec!(
+            #[cfg(feature = "mock")] (VRDeviceType::Mock, MockServiceCreator::new()),
+            #[cfg(feature = "openvr")] (VRDeviceType::OpenVR, OpenVRServiceCreator::new())
+        );
+        
+        for creator in &creators {
+            if creator.0 == device_type {
+                return creator.1.new_compositor();
+            }
+        }
+
+        Err("Compositor not found".into())
+    }
 }
 
 impl VRServiceManager {
     fn fetch_devices(&mut self) {
         self.initialize_services();
 
-        for service in &self.services {
-            let devices = service.borrow_mut().fetch_devices();
+        for service in &mut self.services {
+            let devices = service.fetch_devices();
             if let Ok(devices) = devices {
                 for device in devices {
                     let key = device.borrow().device_id();

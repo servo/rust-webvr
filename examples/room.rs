@@ -338,9 +338,10 @@ pub fn main() {
 
     let mut framebuffer = target_texture.as_surface();
     let mut event_counter = 0u64;
+    let mut compositor = device.borrow().create_compositor().unwrap();
 
     loop {
-        device.borrow_mut().sync_poses();
+        compositor.sync_poses();
 
         let device_data = device.borrow().get_display_data();
         if let Some(ref stage) = device_data.stage_parameters {
@@ -393,7 +394,7 @@ pub fn main() {
             texture_id: target_texture.get_id(),
             .. Default::default()
         };
-        device.borrow_mut().submit_frame(&layer);
+        compositor.submit_frame(&layer);
 
         // render per eye to the FBO
         target.clear_color(1.0, 0.0, 0.0, 1.0);

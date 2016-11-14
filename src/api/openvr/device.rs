@@ -6,9 +6,10 @@ use super::openvr_sys::EVRInitError::*;
 use super::openvr_sys::ETrackingUniverseOrigin::*;
 use super::openvr_sys::EGraphicsAPIConvention::*;
 use super::constants;
+use super::compositor::OpenVRCompositor;
 use super::super::utils;
-use {VRDevice, VRDisplayData, VRDisplayCapabilities, VREyeParameters, 
-    VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRLayer };
+use {VRDevice, VRDeviceType, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
+    VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRCompositor };
 use std::ffi::CString;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -21,11 +22,11 @@ pub type OpenVRDevicePtr = Arc<RefCell<OpenVRDevice>>;
 pub struct OpenVRDevice {
     device_id: u64,
     system: *mut openvr::VR_IVRSystem_FnTable,
-    index: openvr::TrackedDeviceIndex_t,
-    compositor: *mut openvr::VR_IVRCompositor_FnTable
+    index: openvr::TrackedDeviceIndex_t
 }
 
 unsafe impl Send for OpenVRDevice {}
+unsafe impl Sync for OpenVRDevice {}
 
 impl OpenVRDevice {
     pub fn new(system: *mut openvr::VR_IVRSystem_FnTable, 
@@ -35,7 +36,6 @@ impl OpenVRDevice {
             device_id: utils::new_device_id(),
             system: system,
             index: index,
-            compositor: ptr::null_mut()
         }))
     }
 }
@@ -45,6 +45,11 @@ impl VRDevice for OpenVRDevice {
     fn device_id(&self) -> u64 {
         self.device_id
     }
+
+    fn device_type(&self) -> VRDeviceType {
+        VRDeviceType::OpenVR
+    }
+
     // Returns the current display data.
     fn get_display_data(&self) -> VRDisplayData {
         let mut data = VRDisplayData::default();
@@ -99,38 +104,9 @@ impl VRDevice for OpenVRDevice {
         }
     }
 
-    fn sync_poses(&mut self) {
-        if !self.ensure_compositor_initialized() {
-            return;
-        }
-        unsafe {
-            let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
-                              = mem::uninitialized();
-            (*self.compositor).WaitGetPoses.unwrap()(&mut tracked_poses[0], 
-                                                 constants::K_UNMAXTRACKEDDEVICECOUNT, 
-                                                 ptr::null_mut(), 0);
-        }
-    }
-
-    fn submit_frame(&mut self, layer: &VRLayer) {
-        // Lazy load the compositor
-        if !self.ensure_compositor_initialized() {
-            return;
-        }
-        let mut texture: openvr::Texture_t = unsafe { mem::uninitialized() };
-        texture.handle = unsafe { mem::transmute(layer.texture_id as u64) };
-        texture.eColorSpace = openvr::EColorSpace::EColorSpace_ColorSpace_Auto;
-        texture.eType = EGraphicsAPIConvention_API_OpenGL;
-
-        let mut left_bounds = texture_bounds_to_openvr(&layer.left_bounds);
-        let mut right_bounds = texture_bounds_to_openvr(&layer.right_bounds);
-        let flags = openvr::EVRSubmitFlags::EVRSubmitFlags_Submit_Default;
-
-        unsafe {
-            (*self.compositor).Submit.unwrap()(EVREye_Eye_Left, &mut texture, &mut left_bounds, flags);
-            (*self.compositor).Submit.unwrap()(EVREye_Eye_Right, &mut texture, &mut right_bounds, flags);
-            (*self.compositor).PostPresentHandoff.unwrap()();
-        }
+    // Borrows a VRCompositor which allows to sync and submit frames to the HMD
+    fn create_compositor(&self) -> Result<Box<VRCompositor>, String> {
+        OpenVRCompositor::new().map(|c| Box::new(c) as Box<VRCompositor>)
     }
 }
 
@@ -347,25 +323,6 @@ impl OpenVRDevice {
             0.04f32
         }
     }
-
-    fn ensure_compositor_initialized(&mut self) -> bool {
-        if self.compositor != ptr::null_mut() {
-            return true;
-        }
-    
-        unsafe {
-            let mut error = EVRInitError_VRInitError_None;
-            let name = CString::new(format!("FnTable:{}",constants::IVRCOMPOSITOR_VERSION)).unwrap();
-            self.compositor = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
-                          as *mut openvr::VR_IVRCompositor_FnTable;
-            if error as u32 != EVRInitError_VRInitError_None as u32 {
-                self.compositor = ptr::null_mut();
-                error!("Error initializing OpenVR compositor: {:?}", error as u32);
-            }
-        }
-
-        self.compositor != ptr::null_mut()
-    }
 }
 
 // Helper functions
@@ -416,14 +373,3 @@ fn copysign(a: f32, b: f32) -> f32 {
         a.abs() * b.signum()
     }
 }
-
-fn texture_bounds_to_openvr(bounds: &[f32; 4]) -> openvr::VRTextureBounds_t {
-    let mut result: openvr::VRTextureBounds_t = unsafe { mem::uninitialized() };
-    // WebVR uses uMin, vMin, uWidth and vHeight bounds
-    result.uMin = bounds[0];
-    result.vMin = bounds[1];
-    result.uMax = result.uMin + bounds[2];
-    result.vMax = result.vMin + bounds[3]; 
-    result
-}
-

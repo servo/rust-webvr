@@ -1,19 +1,21 @@
-use {VRDevice, VRDisplayData, VRFrameData, VRStageParameters, VRLayer};
+use {VRDevice, VRDeviceType, VRDisplayData, VRFrameData, VRStageParameters, VRCompositor};
 use super::super::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
+use super::compositor::MockVRCompositor;
 pub type MockVRDevicePtr = Arc<RefCell<MockVRDevice>>;
 
 pub struct MockVRDevice {
-    device_id: u64,
+    device_id: u64
 }
 
 unsafe impl Send for MockVRDevice {}
+unsafe impl Sync for MockVRDevice {}
 
 impl MockVRDevice {
     pub fn new() -> MockVRDevicePtr {
         Arc::new(RefCell::new(MockVRDevice {
-            device_id: utils::new_device_id()
+            device_id: utils::new_device_id(),
         }))
     }
 }
@@ -23,6 +25,11 @@ impl VRDevice for MockVRDevice {
     fn device_id(&self) -> u64 {
         self.device_id
     }
+
+    fn device_type(&self) -> VRDeviceType {
+        VRDeviceType::Mock
+    }
+
     fn get_display_data(&self) -> VRDisplayData {
         let mut data = VRDisplayData::default();
         
@@ -92,7 +99,6 @@ impl VRDevice for MockVRDevice {
                                   0.0, 1.0, 0.0, 0.0,
                                   0.0, 0.0, 1.0, 0.0,
                                   0.035949998, 0.0, 0.015, 1.0];
-        
 
         data
     }
@@ -101,12 +107,8 @@ impl VRDevice for MockVRDevice {
 
     }
 
-    fn sync_poses(&mut self) {
-
-    }
-
-    fn submit_frame(&mut self, _layer: &VRLayer) {
-
+    fn create_compositor(&self) -> Result<Box<VRCompositor>, String> {
+        Ok(Box::new(MockVRCompositor::new()))
     }
 }
 

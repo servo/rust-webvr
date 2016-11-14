@@ -1,4 +1,4 @@
-use {VRService, VRServicePtr, VRDevice, VRDevicePtr, VRDisplayEvent, VRDisplayEventReason};
+use {VRService, VRDevice, VRDevicePtr, VRDisplayEvent, VRDisplayEventReason};
 use super::constants;
 use super::device::{OpenVRDevice, OpenVRDevicePtr};
 use super::openvr_sys as openvr;
@@ -7,9 +7,7 @@ use super::openvr_sys::EVRApplicationType::*;
 use super::openvr_sys::ETrackedDeviceClass::*;
 use super::openvr_sys::EVREventType::*;
 use std::ffi::CString;
-use std::sync::Arc;
 use std::ptr;
-use std::cell::RefCell;
 use std::mem;
 
 pub struct OpenVRService {
@@ -162,12 +160,12 @@ impl Drop for OpenVRService {
 }
 
 impl OpenVRService {
-    pub fn new() -> VRServicePtr {
-        Arc::new(RefCell::new(OpenVRService {
+    pub fn new() -> OpenVRService {
+        OpenVRService {
             initialized: false,
             devices: Vec::new(),
             system: ptr::null_mut(),
-        }))
+        }
     }
     fn clone_devices(&self) -> Vec<VRDevicePtr> {
         self.devices.iter().map(|d| d.clone() as VRDevicePtr).collect()

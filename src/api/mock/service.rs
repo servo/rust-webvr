@@ -1,7 +1,5 @@
-use {VRService, VRServicePtr, VRDevicePtr, VRDisplayEvent};
+use {VRService, VRDevicePtr, VRDisplayEvent};
 use super::device::{MockVRDevice, MockVRDevicePtr};
-use std::sync::Arc;
-use std::cell::RefCell;
 
 pub struct MockVRService {
     devices: Vec<MockVRDevicePtr>,
@@ -33,10 +31,10 @@ impl VRService for MockVRService {
 }
 
 impl MockVRService {
-    pub fn new() -> VRServicePtr {
-        Arc::new(RefCell::new(MockVRService {
+    pub fn new() -> MockVRService {
+        MockVRService {
             devices: Vec::new(),
-        }))
+        }
     }
     fn clone_devices(&self) -> Vec<VRDevicePtr> {
         self.devices.iter().map(|d| d.clone() as VRDevicePtr).collect()

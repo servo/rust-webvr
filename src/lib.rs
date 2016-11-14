@@ -16,6 +16,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 
+pub mod vr_compositor;
 pub mod vr_device;
 pub mod vr_service;
 pub mod vr_manager;
@@ -30,8 +31,9 @@ pub mod vr_stage_parameters;
 pub mod vr_event;
 pub mod vr_field_view;
 
-pub use vr_device::{VRDevice,VRDevicePtr};
-pub use vr_service::{VRService,VRServicePtr};
+pub use vr_compositor::VRCompositor;
+pub use vr_device::{VRDevice,VRDevicePtr,VRDeviceType};
+pub use vr_service::{VRService,VRServiceCreator};
 pub use vr_manager::VRServiceManager;
 pub use vr_display_data::VRDisplayData;
 pub use vr_display_capabilities::VRDisplayCapabilities;

@@ -1,4 +1,3 @@
-use VRCompositor;
 use VRDevicePtr;
 use VRDisplayEvent;
 
@@ -14,5 +13,4 @@ pub trait VRService: Send {
 
 pub trait VRServiceCreator {
     fn new_service(&self) -> Box<VRService>;
-    fn new_compositor(&self) -> Result<Box<VRCompositor>, String>;
 }

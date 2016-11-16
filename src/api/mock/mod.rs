@@ -1,8 +1,7 @@
 mod device;
 mod service;
-mod compositor;
 
-use {VRCompositor, VRService, VRServiceCreator};
+use {VRService, VRServiceCreator};
 
 pub struct MockServiceCreator;
 
@@ -13,12 +12,7 @@ impl MockServiceCreator {
 }
 
 impl VRServiceCreator for MockServiceCreator {
-
      fn new_service(&self) -> Box<VRService> {
          Box::new(service::MockVRService::new())
-     }
-
-     fn new_compositor(&self) -> Result<Box<VRCompositor>, String> {
-         Ok(Box::new(compositor::MockVRCompositor::new()))
      }
 }

@@ -1,6 +1,4 @@
-use VRDisplayData;
-use VRFrameData;
-use VRCompositor;
+use {VRDisplayData, VRFrameData, VRLayer};
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type VRDevicePtr = Arc<RefCell<VRDevice>>;
@@ -11,47 +9,33 @@ pub trait VRDevice: Send + Sync {
     // Returns unique device identifier
     fn device_id(&self) -> u64;
 
-    // Returns the device type
-    fn device_type(&self) -> VRDeviceType;
-
     // Returns the current display data.
-    fn get_display_data(&self) -> VRDisplayData;
+    fn display_data(&self) -> VRDisplayData;
 
-    // Returns the VRFrameData with the information required to render the current frame.
-    fn get_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData;
+    // Returns the inmediate VRFrameData of the HMD
+    // Shpuld be used when not presenting to the device.
+    fn inmediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData;
+
+    // Returns the synced VRFrameData to render the current frame.
+    // Should be used when presenting to the device.
+    // sync_poses must have been called before this call.
+    fn synced_frame_data(&self, next: f64, far_z: f64) -> VRFrameData;
 
     // Resets the pose for this display
     fn reset_pose(&mut self);
 
-    // creates a compositor which allows to sync and submit frames to the HMD
-    fn create_compositor(&self) -> Result<Box<VRCompositor>, String>;
+    // Synchronization point to keep in step with the HMD
+    // Returns VRFrameData to be used in the next render frame
+    // Must be called in the render thread, before doing any work
+    fn sync_poses(&mut self);
+
+    // Submits frame to the display
+    // Must be called in the render thread
+    fn submit_frame(&mut self, layer: &VRLayer);
 }
 
 impl PartialEq for VRDevice {
     fn eq(&self, other: &VRDevice) -> bool {
         self.device_id() == other.device_id()
-    }
-}
-
-// Enum of all available Implementations
-// This is used to send VRCompositor creation commands across ipc-channels.
-#[allow(unused_attributes)]
-#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
-pub enum VRDeviceType {
-    Mock = 1,
-    OpenVR = 2
-}
-
-impl VRDeviceType {
-    pub fn from_u32(val: u32) -> Option<VRDeviceType> {
-        match val {
-            1 => Some(VRDeviceType::Mock),
-            2 => Some(VRDeviceType::OpenVR),
-            _ => None
-        }
-    }
-
-    pub fn as_u32(&self) -> u32 {
-        *self as u32
     }
 }

@@ -6,10 +6,9 @@ use super::openvr_sys::EVRInitError::*;
 use super::openvr_sys::ETrackingUniverseOrigin::*;
 use super::openvr_sys::EGraphicsAPIConvention::*;
 use super::constants;
-use super::compositor::OpenVRCompositor;
 use super::super::utils;
-use {VRDevice, VRDeviceType, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
-    VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRCompositor };
+use {VRDevice, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
+    VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRLayer};
 use std::ffi::CString;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -22,7 +21,8 @@ pub type OpenVRDevicePtr = Arc<RefCell<OpenVRDevice>>;
 pub struct OpenVRDevice {
     device_id: u64,
     system: *mut openvr::VR_IVRSystem_FnTable,
-    index: openvr::TrackedDeviceIndex_t
+    index: openvr::TrackedDeviceIndex_t,
+    compositor: *mut openvr::VR_IVRCompositor_FnTable
 }
 
 unsafe impl Send for OpenVRDevice {}
@@ -36,6 +36,7 @@ impl OpenVRDevice {
             device_id: utils::new_device_id(),
             system: system,
             index: index,
+            compositor: ptr::null_mut()
         }))
     }
 }
@@ -46,12 +47,8 @@ impl VRDevice for OpenVRDevice {
         self.device_id
     }
 
-    fn device_type(&self) -> VRDeviceType {
-        VRDeviceType::OpenVR
-    }
-
     // Returns the current display data.
-    fn get_display_data(&self) -> VRDisplayData {
+    fn display_data(&self) -> VRDisplayData {
         let mut data = VRDisplayData::default();
         
         OpenVRDevice::fetch_capabilities(&mut data.capabilities);
@@ -66,36 +63,42 @@ impl VRDevice for OpenVRDevice {
         data
     }
 
-    // Returns the VRFrameData with the information required to render the current frame.
-    fn get_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
-        let near_z = near_z as f32;
-        let far_z = far_z as f32;
+    fn inmediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
-        self.fetch_pose(&mut data.pose);
-        self.fetch_projection_matrix(EVREye_Eye_Left, near_z, far_z, &mut data.left_projection_matrix);
-        self.fetch_projection_matrix(EVREye_Eye_Right, near_z, far_z, &mut data.right_projection_matrix);
 
-        let mut view_matrix: [f32; 16] = unsafe { mem::uninitialized() };
-        self.fetch_view_matrix(&mut view_matrix);
+        let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
+                              = unsafe { mem::uninitialized() };
+        unsafe {
+            // Calculates updated poses for all devices
+            (*self.system).GetDeviceToAbsoluteTrackingPose.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated,
+                                                                    self.get_seconds_to_photons(),
+                                                                    &mut tracked_poses[0],
+                                                                    constants::K_UNMAXTRACKEDDEVICECOUNT);
+        };
 
-        let mut left_eye:[f32; 16] = unsafe { mem::uninitialized() };
-        let mut right_eye:[f32; 16] = unsafe { mem::uninitialized() };
-        
-        // Fech the transform of each eye
-        self.fetch_eye_to_head_matrix(EVREye_Eye_Left, &mut left_eye);
-        self.fetch_eye_to_head_matrix(EVREye_Eye_Right, &mut right_eye);
-
-        // View matrix must by multiplied by each eye_to_head transformation matrix
-        utils::multiply_matrix(&view_matrix, &left_eye, &mut data.left_view_matrix);
-        utils::multiply_matrix(&view_matrix, &right_eye, &mut data.right_view_matrix);
-        // Invert matrices
-        utils::inverse_matrix(&data.left_view_matrix, &mut view_matrix);
-        data.left_view_matrix = view_matrix;
-        utils::inverse_matrix(&data.right_view_matrix, &mut view_matrix);
-        data.right_view_matrix = view_matrix;
+        let device_pose = &tracked_poses[self.index as usize];
+        self.fetch_frame_data(near_z as f32, far_z as f32, &device_pose, &mut data);
 
         data
     }
+
+     fn synced_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
+         if self.compositor == ptr::null_mut() {
+             // Fallback to inmediate mode if compositor not available
+             self.inmediate_frame_data(near_z, far_z);
+         }
+
+         let mut device_pose: openvr::TrackedDevicePose_t = unsafe { mem::uninitialized() };
+         unsafe {
+             (*self.compositor).GetLastPoseForTrackedDeviceIndex.unwrap()(self.index,
+                                                                          &mut device_pose,
+                                                                          ptr::null_mut());
+         }
+         let mut data = VRFrameData::default();
+         self.fetch_frame_data(near_z as f32, far_z as f32, &device_pose, &mut data);
+
+         data
+      }
 
     // Resets the pose for this display
     fn reset_pose(&mut self) {
@@ -104,9 +107,33 @@ impl VRDevice for OpenVRDevice {
         }
     }
 
-    // Borrows a VRCompositor which allows to sync and submit frames to the HMD
-    fn create_compositor(&self) -> Result<Box<VRCompositor>, String> {
-        OpenVRCompositor::new().map(|c| Box::new(c) as Box<VRCompositor>)
+    fn sync_poses(&mut self) {
+        if !self.ensure_compositor_ready() {
+            return;
+        }
+        unsafe {
+            (*self.compositor).WaitGetPoses.unwrap()(ptr::null_mut(), 0, ptr::null_mut(), 0);
+        }
+    }
+
+    fn submit_frame(&mut self, layer: &VRLayer) {
+        if !self.ensure_compositor_ready() {
+            return;
+        }
+        let mut texture: openvr::Texture_t = unsafe { mem::uninitialized() };
+        texture.handle = unsafe { mem::transmute(layer.texture_id as u64) };
+        texture.eColorSpace = openvr::EColorSpace::EColorSpace_ColorSpace_Auto;
+        texture.eType = EGraphicsAPIConvention_API_OpenGL;
+
+        let mut left_bounds = texture_bounds_to_openvr(&layer.left_bounds);
+        let mut right_bounds = texture_bounds_to_openvr(&layer.right_bounds);
+        let flags = openvr::EVRSubmitFlags::EVRSubmitFlags_Submit_Default;
+
+        unsafe {
+            (*self.compositor).Submit.unwrap()(EVREye_Eye_Left, &mut texture, &mut left_bounds, flags);
+            (*self.compositor).Submit.unwrap()(EVREye_Eye_Right, &mut texture, &mut right_bounds, flags);
+            (*self.compositor).PostPresentHandoff.unwrap()();
+        }
     }
 }
 
@@ -175,14 +202,13 @@ impl OpenVRDevice {
         self.fetch_field_of_view(EVREye_Eye_Left, &mut left.field_of_view);
         self.fetch_field_of_view(EVREye_Eye_Right, &mut right.field_of_view);
 
-        // Get the interpupillary distance. 
-        // Distance between the center of the left pupil and the center of the right pupil in meters.
-        // Use the default average value 0.065 if the functions fails to get the value from the API.
-        let ipd_meters = self.get_float_property(ETrackedDeviceProperty_Prop_UserIpdMeters_Float)
-                           .unwrap_or(0.06f32);
+        let (left_matrix, right_matrix) = unsafe {
+            ((*self.system).GetEyeToHeadTransform.unwrap()(EVREye_Eye_Left),
+             (*self.system).GetEyeToHeadTransform.unwrap()(EVREye_Eye_Right))
+        };
         
-        left.offset = [ipd_meters * -0.5, 0.0, 0.0];
-        right.offset = [ipd_meters * 0.5, 0.0, 0.0];
+        left.offset = [left_matrix.m[0][3], left_matrix.m[1][3], left_matrix.m[2][3]];
+        right.offset = [right_matrix.m[0][3], right_matrix.m[1][3], right_matrix.m[2][3]];
 
         let (mut width, mut height) = (0, 0);
         unsafe {
@@ -228,6 +254,37 @@ impl OpenVRDevice {
         });
     }
 
+    fn fetch_frame_data(&self,
+                        near_z: f32,
+                        far_z: f32,
+                        device_pose: &openvr::TrackedDevicePose_t,
+                        out: &mut VRFrameData) {
+        let near_z = near_z as f32;
+        let far_z = far_z as f32;
+        self.fetch_pose(&device_pose, &mut out.pose);
+        self.fetch_projection_matrix(EVREye_Eye_Left, near_z, far_z, &mut out.left_projection_matrix);
+        self.fetch_projection_matrix(EVREye_Eye_Right, near_z, far_z, &mut out.right_projection_matrix);
+
+        let mut view_matrix: [f32; 16] = unsafe { mem::uninitialized() };
+        self.fetch_view_matrix(&device_pose, &mut view_matrix);
+
+        let mut left_eye:[f32; 16] = unsafe { mem::uninitialized() };
+        let mut right_eye:[f32; 16] = unsafe { mem::uninitialized() };
+        
+        // Fech the transform of each eye
+        self.fetch_eye_to_head_matrix(EVREye_Eye_Left, &mut left_eye);
+        self.fetch_eye_to_head_matrix(EVREye_Eye_Right, &mut right_eye);
+
+        // View matrix must by multiplied by each eye_to_head transformation matrix
+        utils::multiply_matrix(&view_matrix, &left_eye, &mut out.left_view_matrix);
+        utils::multiply_matrix(&view_matrix, &right_eye, &mut out.right_view_matrix);
+        // Invert matrices
+        utils::inverse_matrix(&out.left_view_matrix, &mut view_matrix);
+        out.left_view_matrix = view_matrix;
+        utils::inverse_matrix(&out.right_view_matrix, &mut view_matrix);
+        out.right_view_matrix = view_matrix;
+    }
+
     fn fetch_projection_matrix(&self, eye: openvr::EVREye, near: f32, far: f32, out: &mut [f32; 16]) {
         let matrix = unsafe {
             (*self.system).GetProjectionMatrix.unwrap()(eye, near, far, EGraphicsAPIConvention_API_OpenGL)
@@ -242,18 +299,7 @@ impl OpenVRDevice {
         *out = openvr_matrix34_to_array(&matrix);
     }
 
-    fn fetch_pose(&self, pose:&mut VRPose) {
-        let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
-                              = unsafe { mem::uninitialized() };
-        unsafe {
-            // Calculates updated poses for all devices
-            (*self.system).GetDeviceToAbsoluteTrackingPose.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated,
-                                                                    self.get_seconds_to_photons(),
-                                                                    &mut tracked_poses[0],
-                                                                    constants::K_UNMAXTRACKEDDEVICECOUNT);
-        };
-
-        let device_pose = &tracked_poses[self.index as usize];
+    fn fetch_pose(&self, device_pose:&openvr::TrackedDevicePose_t, out:&mut VRPose) {
         if  device_pose.bPoseIsValid == 0 {
             // For some reason the pose may not be valid, return a empty one
             return;
@@ -261,41 +307,28 @@ impl OpenVRDevice {
 
         // OpenVR returns a transformation matrix
         // WebVR expects a quaternion, we have to decompose the transformation matrix
-        pose.orientation = Some(openvr_matrix_to_quat(&device_pose.mDeviceToAbsoluteTracking));
+        out.orientation = Some(openvr_matrix_to_quat(&device_pose.mDeviceToAbsoluteTracking));
 
         // Decompose position from transformation matrix
-        pose.position = Some(openvr_matrix_to_position(&device_pose.mDeviceToAbsoluteTracking));
+        out.position = Some(openvr_matrix_to_position(&device_pose.mDeviceToAbsoluteTracking));
 
         // Copy linear velocity and angular velocity
-        pose.linear_velocity = Some([device_pose.vVelocity.v[0], 
+        out.linear_velocity = Some([device_pose.vVelocity.v[0], 
                                      device_pose.vVelocity.v[1], 
                                      device_pose.vVelocity.v[2]]);
-        pose.angular_velocity = Some([device_pose.vAngularVelocity.v[0], 
+        out.angular_velocity = Some([device_pose.vAngularVelocity.v[0], 
                                       device_pose.vAngularVelocity.v[1], 
                                       device_pose.vAngularVelocity.v[2]]);
 
         // TODO: OpenVR doesn't expose linear and angular acceleration
         // Derive them from GetDeviceToAbsoluteTrackingPose with different predicted seconds_photons?
-
     }
 
-    fn fetch_view_matrix(&self, out: &mut [f32; 16]) {
-
-        let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
-                              = unsafe { mem::uninitialized() };
-        unsafe {
-            // Calculates updated poses for all devices
-            (*self.system).GetDeviceToAbsoluteTrackingPose.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated,
-                                                                    self.get_seconds_to_photons(),
-                                                                    &mut tracked_poses[0],
-                                                                    constants::K_UNMAXTRACKEDDEVICECOUNT);
-        };
-
-        let pose = &tracked_poses[self.index as usize];
-        if  pose.bPoseIsValid == 0 {
+    fn fetch_view_matrix(&self, device_pose: &openvr::TrackedDevicePose_t, out: &mut [f32; 16]) {
+        if device_pose.bPoseIsValid == 0 {
             *out = identity_matrix!();
         } else {
-            *out = openvr_matrix34_to_array(&pose.mDeviceToAbsoluteTracking);
+            *out = openvr_matrix34_to_array(&device_pose.mDeviceToAbsoluteTracking);
         }
     }
 
@@ -321,6 +354,28 @@ impl OpenVRDevice {
             frame_duration - seconds_last_vsync + vsync_to_photons
         } else {
             0.04f32
+        }
+    }
+
+    fn ensure_compositor_ready(&mut self)-> bool {
+        if self.compositor != ptr::null_mut() {
+            return true;
+        }
+
+        unsafe {
+            let mut error = EVRInitError_VRInitError_None;
+            let name = CString::new(format!("FnTable:{}",constants::IVRCOMPOSITOR_VERSION)).unwrap();
+            self.compositor = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
+                          as *mut openvr::VR_IVRCompositor_FnTable;
+            if error as u32 == EVRInitError_VRInitError_None as u32 && self.compositor != ptr::null_mut() {
+                // Set seated tracking space (default in WebVR)
+                (*self.compositor).SetTrackingSpace.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated);
+                true
+            } else {
+                error!("Error initializing OpenVR compositor: {:?}", error as u32);
+                self.compositor = ptr::null_mut();
+                false
+            }
         }
     }
 }
@@ -372,4 +427,14 @@ fn copysign(a: f32, b: f32) -> f32 {
     } else {
         a.abs() * b.signum()
     }
+}
+
+fn texture_bounds_to_openvr(bounds: &[f32; 4]) -> openvr::VRTextureBounds_t {
+    let mut result: openvr::VRTextureBounds_t = unsafe { mem::uninitialized() };
+    // WebVR uses uMin, vMin, uWidth and vHeight bounds
+    result.uMin = bounds[0];
+    result.vMin = bounds[1];
+    result.uMax = result.uMin + bounds[2];
+    result.vMax = result.vMin + bounds[3]; 
+    result
 }

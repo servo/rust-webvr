@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 use VRDevicePtr;
-use VRDeviceType;
 use VRDisplayEvent;
 use VRService;
 use VRServiceCreator;
-use VRCompositor;
 
 #[cfg(feature = "openvr")]
 use api::OpenVRServiceCreator;
@@ -93,22 +91,6 @@ impl VRServiceManager {
 
     pub fn is_initialized(&self) -> bool {
         self.initialized
-    }
-
-    pub fn create_compositor(device_type: VRDeviceType) -> Result<Box<VRCompositor>, String> {
-
-        let creators: Vec<(VRDeviceType, Box<VRServiceCreator>)> = vec!(
-            #[cfg(feature = "mock")] (VRDeviceType::Mock, MockServiceCreator::new()),
-            #[cfg(feature = "openvr")] (VRDeviceType::OpenVR, OpenVRServiceCreator::new())
-        );
-        
-        for creator in &creators {
-            if creator.0 == device_type {
-                return creator.1.new_compositor();
-            }
-        }
-
-        Err("Compositor not found".into())
     }
 }
 

@@ -1,8 +1,7 @@
-use {VRDevice, VRDeviceType, VRDisplayData, VRFrameData, VRStageParameters, VRCompositor};
+use {VRDevice, VRDisplayData, VRFrameData, VRStageParameters, VRLayer};
 use super::super::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
-use super::compositor::MockVRCompositor;
 pub type MockVRDevicePtr = Arc<RefCell<MockVRDevice>>;
 
 pub struct MockVRDevice {
@@ -26,11 +25,7 @@ impl VRDevice for MockVRDevice {
         self.device_id
     }
 
-    fn device_type(&self) -> VRDeviceType {
-        VRDeviceType::Mock
-    }
-
-    fn get_display_data(&self) -> VRDisplayData {
+    fn display_data(&self) -> VRDisplayData {
         let mut data = VRDisplayData::default();
         
         // Mock display data
@@ -52,7 +47,7 @@ impl VRDevice for MockVRDevice {
             size_y: 2.0
         });
 
-        data.left_eye_parameters.offset = [0.035949998, 0.0, 0.0];
+        data.left_eye_parameters.offset = [0.035949998, 0.0, 0.015];
         data.left_eye_parameters.render_width = 1512;
         data.left_eye_parameters.render_height = 1680;
         data.left_eye_parameters.field_of_view.up_degrees = 55.82093048095703;
@@ -60,7 +55,7 @@ impl VRDevice for MockVRDevice {
         data.left_eye_parameters.field_of_view.down_degrees = 55.707801818847656;
         data.left_eye_parameters.field_of_view.left_degrees = 54.42263412475586;
 
-        data.right_eye_parameters.offset = [-0.035949998, 0.0, 0.0];
+        data.right_eye_parameters.offset = [-0.035949998, 0.0, 0.015];
         data.right_eye_parameters.render_width = 1512;
         data.right_eye_parameters.render_height = 1680;
         data.right_eye_parameters.field_of_view.up_degrees = 55.898048400878906;
@@ -71,7 +66,7 @@ impl VRDevice for MockVRDevice {
         data
     }
 
-    fn get_frame_data(&self, _near_z: f64, _far_z: f64) -> VRFrameData {
+    fn inmediate_frame_data(&self, _near_z: f64, _far_z: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
         // Position vector
         data.pose.position = Some([0.5, -0.7, -0.3]);
@@ -103,12 +98,20 @@ impl VRDevice for MockVRDevice {
         data
     }
 
+    fn synced_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
+        self.inmediate_frame_data(near_z, far_z)
+    }
+
     fn reset_pose(&mut self) {
 
     }
 
-    fn create_compositor(&self) -> Result<Box<VRCompositor>, String> {
-        Ok(Box::new(MockVRCompositor::new()))
+    fn sync_poses(&mut self) {
+        
+    }
+
+    fn submit_frame(&mut self, _layer: &VRLayer) {
+
     }
 }
 

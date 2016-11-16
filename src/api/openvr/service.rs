@@ -102,20 +102,20 @@ impl VRService for OpenVRService {
                 EVREventType_VREvent_TrackedDeviceUserInteractionStarted => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
     
-                        result.push(VRDisplayEvent::Activate(device.borrow().get_display_data(), 
+                        result.push(VRDisplayEvent::Activate(device.borrow().display_data(), 
                                                                    VRDisplayEventReason::Mounted));
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceUserInteractionEnded => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
     
-                        result.push(VRDisplayEvent::Deactivate(device.borrow().get_display_data(), 
+                        result.push(VRDisplayEvent::Deactivate(device.borrow().display_data(), 
                                                                      VRDisplayEventReason::Unmounted));
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceActivated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Connect(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Connect(device.borrow().display_data()))
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceDeactivated => {
@@ -125,19 +125,19 @@ impl VRService for OpenVRService {
                 },
                 EVREventType_VREvent_DashboardActivated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Blur(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Blur(device.borrow().display_data()))
                     }
                 },
                 EVREventType_VREvent_DashboardDeactivated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Focus(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Focus(device.borrow().display_data()))
                     }
                 },
                 EVREventType_VREvent_ChaperoneDataHasChanged |
                 EVREventType_VREvent_IpdChanged |
                 EVREventType_VREvent_TrackedDeviceUpdated => {
                     if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Change(device.borrow().get_display_data()))
+                        result.push(VRDisplayEvent::Change(device.borrow().display_data()))
                     }
                 },
                 _ => {}

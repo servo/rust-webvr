@@ -260,8 +260,9 @@ pub fn main() {
 
     // Select first device
     let device = devices.get(0).unwrap();
+    let mut device = device.borrow_mut();
 
-    let device_data = device.borrow_mut().get_display_data();
+    let device_data = device.display_data();
     println!("VR Device data: {:?}", device_data);
 
     use glium::{DisplayBuild, Surface};
@@ -338,12 +339,14 @@ pub fn main() {
 
     let mut framebuffer = target_texture.as_surface();
     let mut event_counter = 0u64;
-    let mut compositor = device.borrow().create_compositor().unwrap();
+
+    // We can use data.left_view_matrix or data.pose to render the scene
+    let test_pose = false; 
 
     loop {
-        compositor.sync_poses();
+        device.sync_poses();
 
-        let device_data = device.borrow().get_display_data();
+        let device_data = device.display_data();
         if let Some(ref stage) = device_data.stage_parameters {
             // TODO: use event queue instead of checking this every frame
             standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap();
@@ -352,31 +355,36 @@ pub fn main() {
         let mut target = ctx.draw();
         framebuffer.clear_color(0.0, 0.0, 1.0, 1.0);
 
-        let data: VRFrameData = device.borrow().get_frame_data(near, far);
+        let data: VRFrameData = device.synced_frame_data(near, far);
 
-        // Calculate view transform based on pose data
-        // We can also use data.left_view_matrix instead, we use Pose for testing purposes
-        let quaternion = data.pose.orientation.unwrap_or([0.0, 0.0, 0.0, 1.0]);
-        let rotation_transform = Mat4::from(vec_to_quaternion(&quaternion));
-        let position_transform = match data.pose.position {
-            Some(ref position) => vec_to_translation(&position).inverse_transform().unwrap(),
-            None => Matrix4::<f32>::identity()
+        let (left_view_matrix, right_view_matrix) = if test_pose {
+             // Calculate view transform based on pose data
+            let quaternion = data.pose.orientation.unwrap_or([0.0, 0.0, 0.0, 1.0]);
+            let rotation_transform = Mat4::from(vec_to_quaternion(&quaternion));
+            let position_transform = match data.pose.position {
+                Some(ref position) => vec_to_translation(&position).inverse_transform().unwrap(),
+                None => Matrix4::<f32>::identity()
+            };
+            let view = (rotation_transform * position_transform).inverse_transform().unwrap();
+            let left_eye_to_head = vec_to_translation(&device_data.left_eye_parameters.offset);
+            let right_eye_to_head = vec_to_translation(&device_data.right_eye_parameters.offset);
+            ((view * left_eye_to_head).inverse_transform().unwrap(),
+             (view * right_eye_to_head).inverse_transform().unwrap())
+            
+        } else {
+            (*vec_to_matrix(&data.left_view_matrix), *vec_to_matrix(&data.right_view_matrix))
         };
-        
-        let view = rotation_transform * position_transform * standing_transform;
-        let left_eye_to_head = vec_to_translation(&device_data.left_eye_parameters.offset).inverse_transform().unwrap();
-        let right_eye_to_head = vec_to_translation(&device_data.right_eye_parameters.offset).inverse_transform().unwrap();
 
         // render per eye to the FBO
         let eyes =  [
-            (&left_viewport, &data.left_projection_matrix, &left_eye_to_head),
-            (&right_viewport, &data.right_projection_matrix, &right_eye_to_head)
+            (&left_viewport, &data.left_projection_matrix, &left_view_matrix),
+            (&right_viewport, &data.right_projection_matrix, &right_view_matrix)
         ];
 
         for eye in &eyes {
             render_params.viewport = Some(*eye.0);
-            let eye_view = view * eye.2;
             let projection = vec_to_matrix(eye.1);
+            let eye_view = eye.2 * standing_transform;
 
             for mesh in &meshes {
                 let uniforms = uniform! {
@@ -394,7 +402,7 @@ pub fn main() {
             texture_id: target_texture.get_id(),
             .. Default::default()
         };
-        compositor.submit_frame(&layer);
+        device.submit_frame(&layer);
 
         // render per eye to the FBO
         target.clear_color(1.0, 0.0, 0.0, 1.0);

@@ -14,6 +14,7 @@ pub struct OpenVRService {
     initialized: bool,
     devices: Vec<OpenVRDevicePtr>,
     system: *mut openvr::VR_IVRSystem_FnTable,
+    chaperone: *mut openvr::VR_IVRChaperone_FnTable,
 }
 
 unsafe impl Send for OpenVRService {}
@@ -27,6 +28,7 @@ impl VRService for OpenVRService {
             return Err("Not available".into());
         }
 
+        // Initialize OpenVR
         let mut error = EVRInitError_VRInitError_None;
         unsafe {
              openvr::VR_InitInternal(&mut error, EVRApplicationType_VRApplication_Scene);
@@ -36,6 +38,7 @@ impl VRService for OpenVRService {
             return Err(format!("OpenVR Internal failed with error {}", error as u32));
         }
 
+        // Initialize System
         error = EVRInitError_VRInitError_None;
         unsafe {
             let name = CString::new(format!("FnTable:{}",constants::IVRSYSTEM_VERSION)).unwrap();
@@ -46,6 +49,18 @@ impl VRService for OpenVRService {
 
         if error as u32 != EVRInitError_VRInitError_None as u32 {
             return Err(format!("OpenVR GetGenericInterface failed with error {}", error as u32));
+        }
+
+        // Initialize Chaperone
+        error = EVRInitError_VRInitError_None;
+        unsafe {
+            let name = CString::new(format!("FnTable:{}",constants::IVRCHAPERONE_VERSION)).unwrap();
+            self.chaperone = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
+                             as *mut openvr::VR_IVRChaperone_FnTable;
+        }
+          
+        if error as u32 != EVRInitError_VRInitError_None as u32 {
+            return Err(format!("OpenVR GetGenericInterface failed with error {:?}", error));
         }
 
         self.initialized = true;
@@ -71,7 +86,7 @@ impl VRService for OpenVRService {
 
             match device_class {
                 ETrackedDeviceClass_TrackedDeviceClass_HMD => {
-                    self.devices.push(OpenVRDevice::new(self.system, i));
+                    self.devices.push(OpenVRDevice::new(self.system, self.chaperone, i));
                 },
                 _ => {}
             }
@@ -165,6 +180,7 @@ impl OpenVRService {
             initialized: false,
             devices: Vec::new(),
             system: ptr::null_mut(),
+            chaperone: ptr::null_mut()
         }
     }
     fn clone_devices(&self) -> Vec<VRDevicePtr> {

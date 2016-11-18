@@ -260,9 +260,8 @@ pub fn main() {
 
     // Select first device
     let device = devices.get(0).unwrap();
-    let mut device = device.borrow_mut();
 
-    let device_data = device.display_data();
+    let device_data = device.borrow().display_data();
     println!("VR Device data: {:?}", device_data);
 
     use glium::{DisplayBuild, Surface};
@@ -332,9 +331,8 @@ pub fn main() {
         vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
     } else {
         // Stage parameters not avaialbe yet or unsupported
-        // Assume human height 1.75m
-        // vec_to_translation(&[0.0, 1.75, 0.0]).inverse_transform().unwrap()
-        Matrix4::<f32>::identity()
+        // Assume 0.75m transform height
+        vec_to_translation(&[0.0, 0.75, 0.0]).inverse_transform().unwrap()
     };
 
     let mut framebuffer = target_texture.as_surface();
@@ -344,9 +342,9 @@ pub fn main() {
     let test_pose = false; 
 
     loop {
-        device.sync_poses();
+        device.borrow_mut().sync_poses();
 
-        let device_data = device.display_data();
+        let device_data = device.borrow().display_data();
         if let Some(ref stage) = device_data.stage_parameters {
             // TODO: use event queue instead of checking this every frame
             standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap();
@@ -355,7 +353,7 @@ pub fn main() {
         let mut target = ctx.draw();
         framebuffer.clear_color(0.0, 0.0, 1.0, 1.0);
 
-        let data: VRFrameData = device.synced_frame_data(near, far);
+        let data: VRFrameData = device.borrow().synced_frame_data(near, far);
 
         let (left_view_matrix, right_view_matrix) = if test_pose {
              // Calculate view transform based on pose data
@@ -402,7 +400,7 @@ pub fn main() {
             texture_id: target_texture.get_id(),
             .. Default::default()
         };
-        device.submit_frame(&layer);
+        device.borrow_mut().submit_frame(&layer);
 
         // render per eye to the FBO
         target.clear_color(1.0, 0.0, 0.0, 1.0);

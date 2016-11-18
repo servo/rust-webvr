@@ -22,6 +22,7 @@ pub struct OpenVRDevice {
     device_id: u64,
     system: *mut openvr::VR_IVRSystem_FnTable,
     index: openvr::TrackedDeviceIndex_t,
+    chaperone: *mut openvr::VR_IVRChaperone_FnTable,
     compositor: *mut openvr::VR_IVRCompositor_FnTable
 }
 
@@ -29,13 +30,15 @@ unsafe impl Send for OpenVRDevice {}
 unsafe impl Sync for OpenVRDevice {}
 
 impl OpenVRDevice {
-    pub fn new(system: *mut openvr::VR_IVRSystem_FnTable, 
-           index: openvr::TrackedDeviceIndex_t) 
-           -> Arc<RefCell<OpenVRDevice>> {
+    pub fn new(system: *mut openvr::VR_IVRSystem_FnTable,
+               chaperone: *mut openvr::VR_IVRChaperone_FnTable,
+               index: openvr::TrackedDeviceIndex_t) 
+               -> Arc<RefCell<OpenVRDevice>> {
         Arc::new(RefCell::new(OpenVRDevice {
             device_id: utils::new_device_id(),
             system: system,
             index: index,
+            chaperone: chaperone,
             compositor: ptr::null_mut()
         }))
     }
@@ -225,33 +228,35 @@ impl OpenVRDevice {
         let mut size_x = 0f32;
         let mut size_y = 0f32;
 
-        // Check is chaperone interface is available to get the play area size
         unsafe {
-            let mut error = EVRInitError_VRInitError_None;
-            let name = CString::new(format!("FnTable:{}",constants::IVRCHAPERONE_VERSION)).unwrap();
-            let chaperone = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
-                          as *mut openvr::VR_IVRChaperone_FnTable;
-            if chaperone != ptr::null_mut() && error as u32 == EVRInitError_VRInitError_None as u32 {
-                // Chaperone available, update play size area ;)
-                (*chaperone).GetPlayAreaSize.unwrap()(&mut size_x, &mut size_y);
-            }
+            (*self.chaperone).GetPlayAreaSize.unwrap()(&mut size_x, &mut size_y);
         }
 
-        if size_x == 0.0 || size_y == 0.0 {
-            // Play area not available yet
-            return;
+        if size_x > 0.0 && size_y > 0.0 {
+            let matrix: openvr::HmdMatrix34_t = unsafe {
+                (*self.system).GetSeatedZeroPoseToStandingAbsoluteTrackingPose.unwrap()()
+            };
+
+            data.stage_parameters = Some(VRStageParameters {
+                sitting_to_standing_transform: openvr_matrix34_to_array(&matrix),
+                size_x: size_x,
+                size_y: size_y
+            });
+        } else {
+            
+            // Chaperone data not ready yet. HMD might be deactivated.
+            // Use some default average transform until data is ready.
+            let matrix = [1.0, 0.0, 0.0, 0.0,
+                          0.0, 1.0, 0.0, 0.0,
+                          0.0, 0.0, 1.0, 0.0,
+                          0.0, 0.75, 0.0, 1.0];
+
+            data.stage_parameters = Some(VRStageParameters {
+                sitting_to_standing_transform: matrix,
+                size_x: 1.0,
+                size_y: 1.0
+            });
         }
-
-        // Get sitting to standing transform matrix
-        let matrix: openvr::HmdMatrix34_t = unsafe {
-            (*self.system).GetSeatedZeroPoseToStandingAbsoluteTrackingPose.unwrap()()
-        };
-
-        data.stage_parameters = Some(VRStageParameters {
-            sitting_to_standing_transform: openvr_matrix34_to_array(&matrix),
-            size_x: size_x,
-            size_y: size_y
-        });
     }
 
     fn fetch_frame_data(&self,

@@ -5,7 +5,7 @@ authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 [features]
 default = ["openvr", "mock"]
-openvr = ["openvr_sys"]
+openvr = ["libloading"]
 mock = []
 serde-serialization = ["serde", "serde_derive"]
 
@@ -13,7 +13,7 @@ serde-serialization = ["serde", "serde_derive"]
 log  = "0.3"
 serde = { version = "0.8", optional = true }
 serde_derive = { version = "0.8", optional = true }
-openvr_sys = { version = "1.0.2", optional = true }
+libloading = { version = "0.3", optional = true }
 
 [dev-dependencies]
 # Only required to run examples

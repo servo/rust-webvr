@@ -1,6 +1,7 @@
-extern crate openvr_sys;
+mod binding;
 mod constants;
 mod device;
+mod library;
 mod service;
 
 use {VRService, VRServiceCreator};

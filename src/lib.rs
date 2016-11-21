@@ -1,7 +1,7 @@
 #![feature(custom_attribute)]
 #![feature(custom_derive)]
 #![cfg_attr(feature = "serde-serialization", feature(proc_macro))]
-
+#![cfg_attr(feature = "openvr", feature(untagged_unions))]
 
 #[macro_use]
 macro_rules! identity_matrix {
@@ -15,6 +15,8 @@ extern crate serde;
 #[cfg(feature = "serde-serialization")]
 #[macro_use]
 extern crate serde_derive;
+#[cfg(feature = "openvr")]
+extern crate libloading;
 
 pub mod vr_device;
 pub mod vr_service;

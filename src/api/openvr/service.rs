@@ -1,17 +1,20 @@
-use {VRService, VRDevice, VRDevicePtr, VRDisplayEvent, VRDisplayEventReason};
+use super::binding as openvr;
+use super::binding::EVRInitError::*;
+use super::binding::EVRApplicationType::*;
+use super::binding::ETrackedDeviceClass::*;
+use super::binding::EVREventType::*;
 use super::constants;
 use super::device::{OpenVRDevice, OpenVRDevicePtr};
-use super::openvr_sys as openvr;
-use super::openvr_sys::EVRInitError::*;
-use super::openvr_sys::EVRApplicationType::*;
-use super::openvr_sys::ETrackedDeviceClass::*;
-use super::openvr_sys::EVREventType::*;
+use super::library::OpenVRLibrary;
 use std::ffi::CString;
 use std::ptr;
 use std::mem;
+use {VRService, VRDevice, VRDevicePtr, VRDisplayEvent, VRDisplayEventReason};
 
+// OpenVR Service implementation
 pub struct OpenVRService {
     initialized: bool,
+    lib: Option<OpenVRLibrary>,
     devices: Vec<OpenVRDevicePtr>,
     system: *mut openvr::VR_IVRSystem_FnTable,
     chaperone: *mut openvr::VR_IVRChaperone_FnTable,
@@ -24,6 +27,15 @@ impl VRService for OpenVRService {
         if self.initialized {
             return Ok(());
         }
+
+        // Load OpenVR library
+        match unsafe { OpenVRLibrary::new() } {
+            Ok(lib) => self.lib = Some(lib),
+            Err(msg) => {
+                return Err(format!("Error loading OpenVR dll: {:?}", msg));
+            }
+        };
+
         if !self.is_available() {
             return Err("Not available".into());
         }
@@ -31,7 +43,7 @@ impl VRService for OpenVRService {
         // Initialize OpenVR
         let mut error = EVRInitError_VRInitError_None;
         unsafe {
-             openvr::VR_InitInternal(&mut error, EVRApplicationType_VRApplication_Scene);
+             (*self.lib.as_ref().unwrap().init_internal)(&mut error, EVRApplicationType_VRApplication_Scene);
         }
 
         if error as u32 != EVRInitError_VRInitError_None as u32 {
@@ -41,10 +53,9 @@ impl VRService for OpenVRService {
         // Initialize System
         error = EVRInitError_VRInitError_None;
         unsafe {
-            let name = CString::new(format!("FnTable:{}",constants::IVRSYSTEM_VERSION)).unwrap();
-            self.system = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
+            let name = CString::new(format!("FnTable:{}", constants::IVRSystem_Version)).unwrap();
+            self.system = (*self.lib.as_ref().unwrap().get_interface)(name.as_ptr(), &mut error)
                           as *mut openvr::VR_IVRSystem_FnTable;
-            (*self.system).AcknowledgeQuit_UserPrompt.unwrap();
         }
 
         if error as u32 != EVRInitError_VRInitError_None as u32 {
@@ -54,8 +65,8 @@ impl VRService for OpenVRService {
         // Initialize Chaperone
         error = EVRInitError_VRInitError_None;
         unsafe {
-            let name = CString::new(format!("FnTable:{}",constants::IVRCHAPERONE_VERSION)).unwrap();
-            self.chaperone = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
+            let name = CString::new(format!("FnTable:{}", constants::IVRChaperone_Version)).unwrap();
+            self.chaperone = (*self.lib.as_ref().unwrap().get_interface)(name.as_ptr(), &mut error)
                              as *mut openvr::VR_IVRChaperone_FnTable;
         }
           
@@ -75,7 +86,7 @@ impl VRService for OpenVRService {
         // Ensure that there are not initialization errors
         try!(self.initialize());
 
-        let max_device_count: u32 = constants::K_UNMAXTRACKEDDEVICECOUNT;
+        let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
 
         self.devices.clear();
 
@@ -86,7 +97,7 @@ impl VRService for OpenVRService {
 
             match device_class {
                 ETrackedDeviceClass_TrackedDeviceClass_HMD => {
-                    self.devices.push(OpenVRDevice::new(self.system, self.chaperone, i));
+                    self.devices.push(OpenVRDevice::new(self.lib.as_ref().unwrap(), i, self.system, self.chaperone));
                 },
                 _ => {}
             }
@@ -97,8 +108,11 @@ impl VRService for OpenVRService {
     }
 
     fn is_available(&self) -> bool {
-        unsafe { 
-            return openvr::VR_IsHmdPresent() > 0; 
+        unsafe {
+            match self.lib {
+                Some(ref lib) => (*lib.is_hmd_present)(),
+                None => false
+            }
         }
     }
 
@@ -109,7 +123,7 @@ impl VRService for OpenVRService {
         }
         let mut event: openvr::VREvent_t = unsafe { mem::uninitialized() };
         let size = mem::size_of::<openvr::VREvent_t>() as u32;
-        while unsafe { (*self.system).PollNextEvent.unwrap()(&mut event, size) } != 0 {
+        while unsafe { (*self.system).PollNextEvent.unwrap()(&mut event, size) } {
 
             let event_type: openvr::EVREventType = unsafe { mem::transmute(event.eventType) };
 
@@ -168,7 +182,7 @@ impl Drop for OpenVRService {
         if self.initialized {
             unsafe {
                 debug!("OpenVR Shutdown");
-                openvr::VR_ShutdownInternal();
+                (*self.lib.as_ref().unwrap().shutdown_internal)();
             }
         }
     }
@@ -178,6 +192,7 @@ impl OpenVRService {
     pub fn new() -> OpenVRService {
         OpenVRService {
             initialized: false,
+            lib: None,
             devices: Vec::new(),
             system: ptr::null_mut(),
             chaperone: ptr::null_mut()

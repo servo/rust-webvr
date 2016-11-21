@@ -1,14 +1,13 @@
-use super::openvr_sys as openvr;
-use super::openvr_sys::ETrackedPropertyError::*;
-use super::openvr_sys::ETrackedDeviceProperty::*;
-use super::openvr_sys::EVREye::*;
-use super::openvr_sys::EVRInitError::*;
-use super::openvr_sys::ETrackingUniverseOrigin::*;
-use super::openvr_sys::EGraphicsAPIConvention::*;
+use super::binding as openvr;
+use super::binding::ETrackedPropertyError::*;
+use super::binding::ETrackedDeviceProperty::*;
+use super::binding::EVREye::*;
+use super::binding::EVRInitError::*;
+use super::binding::ETrackingUniverseOrigin::*;
+use super::binding::EGraphicsAPIConvention::*;
+use super::library::OpenVRLibrary;
 use super::constants;
 use super::super::utils;
-use {VRDevice, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
-    VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRLayer};
 use std::ffi::CString;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -16,12 +15,16 @@ use std::slice;
 use std::str;
 use std::ptr;
 use std::mem;
+use {VRDevice, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
+    VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRLayer};
+
 pub type OpenVRDevicePtr = Arc<RefCell<OpenVRDevice>>;
 
 pub struct OpenVRDevice {
     device_id: u64,
-    system: *mut openvr::VR_IVRSystem_FnTable,
+    lib: *const OpenVRLibrary,
     index: openvr::TrackedDeviceIndex_t,
+    system: *mut openvr::VR_IVRSystem_FnTable,
     chaperone: *mut openvr::VR_IVRChaperone_FnTable,
     compositor: *mut openvr::VR_IVRCompositor_FnTable
 }
@@ -30,14 +33,16 @@ unsafe impl Send for OpenVRDevice {}
 unsafe impl Sync for OpenVRDevice {}
 
 impl OpenVRDevice {
-    pub fn new(system: *mut openvr::VR_IVRSystem_FnTable,
-               chaperone: *mut openvr::VR_IVRChaperone_FnTable,
-               index: openvr::TrackedDeviceIndex_t) 
+    pub fn new(lib: *const OpenVRLibrary,
+               index: openvr::TrackedDeviceIndex_t,
+               system: *mut openvr::VR_IVRSystem_FnTable,
+               chaperone: *mut openvr::VR_IVRChaperone_FnTable) 
                -> Arc<RefCell<OpenVRDevice>> {
         Arc::new(RefCell::new(OpenVRDevice {
             device_id: utils::new_device_id(),
-            system: system,
+            lib: lib,
             index: index,
+            system: system,
             chaperone: chaperone,
             compositor: ptr::null_mut()
         }))
@@ -69,14 +74,14 @@ impl VRDevice for OpenVRDevice {
     fn inmediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
 
-        let mut tracked_poses: [openvr::TrackedDevicePose_t; constants::K_UNMAXTRACKEDDEVICECOUNT as usize]
+        let mut tracked_poses: [openvr::TrackedDevicePose_t; openvr::k_unMaxTrackedDeviceCount as usize]
                               = unsafe { mem::uninitialized() };
         unsafe {
             // Calculates updated poses for all devices
             (*self.system).GetDeviceToAbsoluteTrackingPose.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated,
                                                                     self.get_seconds_to_photons(),
                                                                     &mut tracked_poses[0],
-                                                                    constants::K_UNMAXTRACKEDDEVICECOUNT);
+                                                                    openvr::k_unMaxTrackedDeviceCount);
         };
 
         let device_pose = &tracked_poses[self.index as usize];
@@ -197,7 +202,7 @@ impl OpenVRDevice {
 
     fn is_connected(&self) -> bool {
         unsafe {
-            (*self.system).IsTrackedDeviceConnected.unwrap()(self.index) != 0
+            (*self.system).IsTrackedDeviceConnected.unwrap()(self.index)
         }
     }
 
@@ -253,8 +258,8 @@ impl OpenVRDevice {
 
             data.stage_parameters = Some(VRStageParameters {
                 sitting_to_standing_transform: matrix,
-                size_x: 1.0,
-                size_y: 1.0
+                size_x: 2.0,
+                size_y: 2.0
             });
         }
     }
@@ -305,7 +310,7 @@ impl OpenVRDevice {
     }
 
     fn fetch_pose(&self, device_pose:&openvr::TrackedDevicePose_t, out:&mut VRPose) {
-        if  device_pose.bPoseIsValid == 0 {
+        if !device_pose.bPoseIsValid {
             // For some reason the pose may not be valid, return a empty one
             return;
         }
@@ -330,7 +335,7 @@ impl OpenVRDevice {
     }
 
     fn fetch_view_matrix(&self, device_pose: &openvr::TrackedDevicePose_t, out: &mut [f32; 16]) {
-        if device_pose.bPoseIsValid == 0 {
+        if !device_pose.bPoseIsValid {
             *out = identity_matrix!();
         } else {
             *out = openvr_matrix34_to_array(&device_pose.mDeviceToAbsoluteTracking);
@@ -348,7 +353,7 @@ impl OpenVRDevice {
         let average_value = 0.04f32;
 
         unsafe {
-            if (*self.system).GetTimeSinceLastVsync.unwrap()(&mut seconds_last_vsync, ptr::null_mut()) == 0 {
+            if !(*self.system).GetTimeSinceLastVsync.unwrap()(&mut seconds_last_vsync, ptr::null_mut()) {
                 // no vsync times are available, return a default average value
                 return average_value;
             }
@@ -369,8 +374,8 @@ impl OpenVRDevice {
 
         unsafe {
             let mut error = EVRInitError_VRInitError_None;
-            let name = CString::new(format!("FnTable:{}",constants::IVRCOMPOSITOR_VERSION)).unwrap();
-            self.compositor = openvr::VR_GetGenericInterface(name.as_ptr(), &mut error)
+            let name = CString::new(format!("FnTable:{}", constants::IVRCompositor_Version)).unwrap();
+            self.compositor = (*(*self.lib).get_interface)(name.as_ptr(), &mut error)
                           as *mut openvr::VR_IVRCompositor_FnTable;
             if error as u32 == EVRInitError_VRInitError_None as u32 && self.compositor != ptr::null_mut() {
                 // Set seated tracking space (default in WebVR)

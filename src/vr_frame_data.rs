@@ -8,7 +8,7 @@ use std::ptr;
 pub struct VRFrameData {
     // Monotonically increasing value that allows the author 
     // to determine if position state data been updated from the hardware
-    pub timestamp: u64,
+    pub timestamp: f64,
 
     // major order column matrix describing the projection to be used for the left eye’s rendering
     pub left_projection_matrix: [f32; 16],
@@ -30,7 +30,7 @@ pub struct VRFrameData {
 impl Default for VRFrameData {
     fn default() -> VRFrameData {
         VRFrameData {
-            timestamp: 0,
+            timestamp: 0f64,
             left_projection_matrix: identity_matrix!(),
             left_view_matrix: identity_matrix!(),
             right_projection_matrix: identity_matrix!(),

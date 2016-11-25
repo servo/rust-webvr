@@ -293,6 +293,8 @@ impl OpenVRDevice {
         out.left_view_matrix = view_matrix;
         utils::inverse_matrix(&out.right_view_matrix, &mut view_matrix);
         out.right_view_matrix = view_matrix;
+
+        out.timestamp = utils::timestamp();
     }
 
     fn fetch_projection_matrix(&self, eye: openvr::EVREye, near: f32, far: f32, out: &mut [f32; 16]) {

@@ -8,6 +8,8 @@ macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);
 }
 
+#[cfg(feature = "openvr")]
+extern crate libloading;
 #[macro_use]
 extern crate log;
 #[cfg(feature = "serde-serialization")]
@@ -15,8 +17,7 @@ extern crate serde;
 #[cfg(feature = "serde-serialization")]
 #[macro_use]
 extern crate serde_derive;
-#[cfg(feature = "openvr")]
-extern crate libloading;
+extern crate time;
 
 pub mod vr_device;
 pub mod vr_service;

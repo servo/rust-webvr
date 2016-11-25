@@ -3,6 +3,8 @@ use super::super::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type MockVRDevicePtr = Arc<RefCell<MockVRDevice>>;
+use std::time::Duration;
+use std::thread;
 
 pub struct MockVRDevice {
     device_id: u64
@@ -95,6 +97,8 @@ impl VRDevice for MockVRDevice {
                                   0.0, 0.0, 1.0, 0.0,
                                   0.035949998, 0.0, 0.015, 1.0];
 
+        data.timestamp = utils::timestamp();
+
         data
     }
 
@@ -107,7 +111,8 @@ impl VRDevice for MockVRDevice {
     }
 
     fn sync_poses(&mut self) {
-        
+        // Simulate Vsync
+        thread::sleep(Duration::from_millis(1));
     }
 
     fn submit_frame(&mut self, _layer: &VRLayer) {

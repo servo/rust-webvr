@@ -1,6 +1,7 @@
 use std::mem;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use std::sync::atomic::Ordering::SeqCst;
+use time;
 
 static DEVICE_ID_COUNTER: AtomicUsize  = ATOMIC_USIZE_INIT;
 
@@ -9,6 +10,11 @@ pub fn new_device_id() -> u64 {
     DEVICE_ID_COUNTER.fetch_add(1, SeqCst) as u64
 }
 
+// Returns the current time in milliseconds
+pub fn timestamp() -> f64 {
+    let timespec = time::get_time();
+    timespec.sec as f64 * 1000.0 + (timespec.nsec as f64 * 1e-6)
+}
 
 // Multiply 4x4 matrices
 #[allow(dead_code)]

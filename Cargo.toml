@@ -13,6 +13,7 @@ serde-serialization = ["serde", "serde_derive"]
 log  = "0.3"
 serde = { version = "0.8", optional = true }
 serde_derive = { version = "0.8", optional = true }
+time = "0.1"
 libloading = { version = "0.3", optional = true }
 
 [dev-dependencies]

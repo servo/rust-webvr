@@ -1,7 +1,20 @@
 [package]
-name = "webvr"
+name = "rust-webvr"
 version = "0.1.0"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
+
+homepage = "https://github.com/MortimerGoro/rust-webvr"
+repository = "https://github.com/MortimerGoro/rust-webvr"
+keywords = ["webvr", "openvr", "oculus", "headset", "vr"]
+license = "MIT"
+
+description = '''Safe rust API that provides a way to interact with Virtual Reality headsets 
+and integration with vendor specific SDKs like OpenVR and Oculus. The API is inspired on the 
+easy to use WebVR API but adapted to Rust design patterns'''
+
+exclude = [
+    "examples/*",
+]
 
 [features]
 default = ["openvr", "mock"]

@@ -1,7 +1,7 @@
 # rust-webvr
-WebVR Core API implementation for servo. We're working on integrating this core module into the Servo browser architecture.
+Safe rust API that provides a way to interact with Virtual Reality headsets and integration with vendor specific SDKs like OpenVR and Oculus. The API is inspired on the easy to use WebVR API but adapted to Rust design patterns.
 
-This module can be tested outside of Servo and even be used as a simple to use VR API on any Rust standalone app which uses native Rust code and native OpenGL calls. It contains a full working OpenVR implementation.
+It's used in the WebVR Core implementation for Servo browser. This module can be tested outside of Servo and even be used on any vanilla Rust app.
 
 ## Room Scale example: 
 

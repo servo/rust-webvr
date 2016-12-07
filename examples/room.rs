@@ -1,4 +1,4 @@
-extern crate webvr;
+extern crate rust_webvr as webvr;
 #[macro_use]
 extern crate glium;
 extern crate cgmath;
@@ -264,6 +264,14 @@ pub fn main() {
     let device_data = device.borrow().display_data();
     println!("VR Device data: {:?}", device_data);
 
+    let gamepads = vr.get_gamepads();
+    println!("*******************");
+    for gamepad in &gamepads {
+        println!("---");
+        println!("VR Gamepad: {:?}", gamepad.borrow().state());
+    }
+    println!("*******************");
+
     use glium::{DisplayBuild, Surface};
 
     let render_width = device_data.left_eye_parameters.render_width;
@@ -339,7 +347,7 @@ pub fn main() {
     let mut event_counter = 0u64;
 
     // We can use data.left_view_matrix or data.pose to render the scene
-    let test_pose = false; 
+    let test_pose = false;
 
     loop {
         device.borrow_mut().sync_poses();
@@ -374,7 +382,7 @@ pub fn main() {
         };
 
         // render per eye to the FBO
-        let eyes =  [
+        let eyes = [
             (&left_viewport, &data.left_projection_matrix, &left_view_matrix),
             (&right_viewport, &data.right_projection_matrix, &right_view_matrix)
         ];
@@ -424,6 +432,13 @@ pub fn main() {
                 println!("VR Event: {:?}", event);
             }
         }
+
+        println!("*******************");
+        for gamepad in &gamepads {
+            println!("---");
+            println!("VR Gamepad: {:?}", gamepad.borrow().state());
+        }
+        println!("*******************");
 
         for event in ctx.poll_events() {
             match event {

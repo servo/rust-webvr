@@ -1,4 +1,4 @@
-use {VRService, VRDevicePtr, VRDisplayEvent};
+use {VRService, VRDevicePtr, VRDisplayEvent, VRGamepadPtr};
 use super::device::{MockVRDevice, MockVRDevicePtr};
 
 pub struct MockVRService {
@@ -18,6 +18,10 @@ impl VRService for MockVRService {
         }
 
         Ok(self.clone_devices())
+    }
+
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
+        Ok(Vec::new())
     }
 
     fn is_available(&self) -> bool {

@@ -32,6 +32,8 @@ pub trait VRDevice: Send + Sync {
     // Submits frame to the display
     // Must be called in the render thread
     fn submit_frame(&mut self, layer: &VRLayer);
+
+    fn stop_present(&mut self) {}
 }
 
 impl PartialEq for VRDevice {

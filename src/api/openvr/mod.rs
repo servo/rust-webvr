@@ -2,6 +2,7 @@ mod binding;
 mod constants;
 mod device;
 mod library;
+mod gamepad;
 mod service;
 
 use {VRService, VRServiceCreator};

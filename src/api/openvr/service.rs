@@ -5,17 +5,19 @@ use super::binding::ETrackedDeviceClass::*;
 use super::binding::EVREventType::*;
 use super::constants;
 use super::device::{OpenVRDevice, OpenVRDevicePtr};
+use super::gamepad::{OpenVRGamepad, OpenVRGamepadPtr};
 use super::library::OpenVRLibrary;
 use std::ffi::CString;
 use std::ptr;
 use std::mem;
-use {VRService, VRDevice, VRDevicePtr, VRDisplayEvent, VRDisplayEventReason};
+use {VRService, VRDevice, VRDevicePtr, VRDisplayEvent, VRDisplayEventReason, VRGamepadPtr};
 
 // OpenVR Service implementation
 pub struct OpenVRService {
     initialized: bool,
     lib: Option<OpenVRLibrary>,
     devices: Vec<OpenVRDevicePtr>,
+    gamepads: Vec<OpenVRGamepadPtr>,
     system: *mut openvr::VR_IVRSystem_FnTable,
     chaperone: *mut openvr::VR_IVRChaperone_FnTable,
 }
@@ -87,8 +89,34 @@ impl VRService for OpenVRService {
         try!(self.initialize());
 
         let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
-
         self.devices.clear();
+
+        for i in 0..max_device_count {
+            let device_class: openvr::ETrackedDeviceClass = unsafe {
+                (*self.system).GetTrackedDeviceClass.unwrap()(i as openvr::TrackedDeviceIndex_t)
+            };
+            
+            match device_class {
+                ETrackedDeviceClass_TrackedDeviceClass_HMD => {
+                    self.devices.push(OpenVRDevice::new(self.lib.as_ref().unwrap(), i, self.system, self.chaperone));
+                },
+                _ => {}
+            }
+        }
+
+
+        Ok(self.clone_devices())
+    }
+
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
+        // Return cached gamepads if available
+        if self.initialized && self.gamepads.len() > 0 {
+            return Ok(self.clone_gamepads());
+        }
+        try!(self.initialize());
+
+        let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
+        self.gamepads.clear();
 
         for i in 0..max_device_count {
             let device_class: openvr::ETrackedDeviceClass = unsafe {
@@ -96,15 +124,14 @@ impl VRService for OpenVRService {
             };
 
             match device_class {
-                ETrackedDeviceClass_TrackedDeviceClass_HMD => {
-                    self.devices.push(OpenVRDevice::new(self.lib.as_ref().unwrap(), i, self.system, self.chaperone));
+                ETrackedDeviceClass_TrackedDeviceClass_Controller => {
+                    self.gamepads.push(OpenVRGamepad::new(i, self.system));
                 },
                 _ => {}
             }
-            
         }
 
-        Ok(self.clone_devices())
+        Ok(self.clone_gamepads())
     }
 
     fn is_available(&self) -> bool {
@@ -181,7 +208,9 @@ impl Drop for OpenVRService {
     fn drop(&mut self) {
         if self.initialized {
             unsafe {
-                debug!("OpenVR Shutdown");
+                self.gamepads.clear();
+                self.devices.clear();
+                println!("OpenVR Shutdown");
                 (*self.lib.as_ref().unwrap().shutdown_internal)();
             }
         }
@@ -194,12 +223,18 @@ impl OpenVRService {
             initialized: false,
             lib: None,
             devices: Vec::new(),
+            gamepads: Vec::new(),
             system: ptr::null_mut(),
             chaperone: ptr::null_mut()
         }
     }
+
     fn clone_devices(&self) -> Vec<VRDevicePtr> {
         self.devices.iter().map(|d| d.clone() as VRDevicePtr).collect()
+    }
+
+    fn clone_gamepads(&self) -> Vec<VRGamepadPtr> {
+        self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect()
     }
 
     pub fn get_device(&self, index: openvr::TrackedDeviceIndex_t) -> Option<&OpenVRDevicePtr> {

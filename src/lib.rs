@@ -32,6 +32,7 @@ pub mod vr_pose;
 pub mod vr_stage_parameters;
 pub mod vr_event;
 pub mod vr_field_view;
+pub mod vr_gamepad;
 
 pub use vr_device::{VRDevice,VRDevicePtr};
 pub use vr_service::{VRService,VRServiceCreator};
@@ -46,5 +47,6 @@ pub use vr_pose::VRPose;
 pub use vr_stage_parameters::VRStageParameters;
 pub use vr_event::{VRDisplayEvent, VRDisplayEventReason};
 pub use vr_field_view::VRFieldOfView;
+pub use vr_gamepad::{VRGamepad, VRGamepadPtr, VRGamepadState, VRGamepadButton};
 
 pub mod api;

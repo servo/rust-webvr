@@ -1,4 +1,4 @@
-extern crate webvr;
+extern crate rust_webvr as webvr;
 #[macro_use]
 extern crate glium;
 extern crate cgmath;

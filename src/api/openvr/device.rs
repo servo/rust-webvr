@@ -49,6 +49,12 @@ impl OpenVRDevice {
     }
 }
 
+impl Drop for OpenVRDevice {
+     fn drop(&mut self) {
+         self.stop_present();
+     }
+}
+
 impl VRDevice for OpenVRDevice {
 
     fn device_id(&self) -> u64 {
@@ -142,6 +148,15 @@ impl VRDevice for OpenVRDevice {
             (*self.compositor).Submit.unwrap()(EVREye_Eye_Right, &mut texture, &mut right_bounds, flags);
             (*self.compositor).PostPresentHandoff.unwrap()();
         }
+    }
+
+    fn stop_present(&mut self) {
+         if self.compositor != ptr::null_mut() {
+             println!("ClearLastSubmittedFrame");
+             unsafe {
+                (*self.compositor).ClearLastSubmittedFrame.unwrap()();
+             }
+         }
     }
 }
 
@@ -271,7 +286,7 @@ impl OpenVRDevice {
                         out: &mut VRFrameData) {
         let near_z = near_z as f32;
         let far_z = far_z as f32;
-        self.fetch_pose(&device_pose, &mut out.pose);
+        OpenVRDevice::fetch_pose(&device_pose, &mut out.pose);
         self.fetch_projection_matrix(EVREye_Eye_Left, near_z, far_z, &mut out.left_projection_matrix);
         self.fetch_projection_matrix(EVREye_Eye_Right, near_z, far_z, &mut out.right_projection_matrix);
 
@@ -311,7 +326,7 @@ impl OpenVRDevice {
         *out = openvr_matrix34_to_array(&matrix);
     }
 
-    fn fetch_pose(&self, device_pose:&openvr::TrackedDevicePose_t, out:&mut VRPose) {
+    pub fn fetch_pose(device_pose:&openvr::TrackedDevicePose_t, out:&mut VRPose) {
         if !device_pose.bPoseIsValid {
             // For some reason the pose may not be valid, return a empty one
             return;
@@ -418,19 +433,24 @@ fn openvr_matrix_to_position(matrix: &openvr::HmdMatrix34_t) -> [f32; 3] {
 // Adapted from http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
 #[inline]
 fn openvr_matrix_to_quat(matrix: &openvr::HmdMatrix34_t) -> [f32; 4] {
+
+    /*let m4 = openvr_matrix34_to_array(&matrix);
+    let mut m = [0f32; 16];
+    utils::inverse_matrix(&m4, &mut m);
+    let m: [[f32;4]; 4] = unsafe { mem::transmute(m) };*/
+
     let m = matrix.m;
     let w = f32::max(0.0, 1.0 + m[0][0] + m[1][1] + m[2][2]).sqrt() * 0.5;
     let mut x = f32::max(0.0, 1.0 + m[0][0] - m[1][1] - m[2][2]).sqrt() * 0.5;
     let mut y = f32::max(0.0, 1.0 - m[0][0] + m[1][1] - m[2][2]).sqrt() * 0.5;
     let mut z = f32::max(0.0, 1.0 - m[0][0] - m[1][1] + m[2][2]).sqrt() * 0.5;
 
-    x = copysign(x, m[1][2] - m[2][1]);
-    y = copysign(y, m[2][0] - m[0][2]);
-    z = copysign(z, m[0][1] - m[1][0]);
+    x = copysign(x, m[2][1] - m[1][2]);
+    y = copysign(y, m[0][2] - m[2][0]);
+    z = copysign(z, m[1][0] - m[0][1]);
 
-    [w, x, y, z]
+    [x, y, z, w]
 }
-
 
 #[inline]
 fn copysign(a: f32, b: f32) -> f32 {

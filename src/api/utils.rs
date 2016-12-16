@@ -6,11 +6,13 @@ use time;
 static DEVICE_ID_COUNTER: AtomicUsize  = ATOMIC_USIZE_INIT;
 
 // Generates a unique identifier for any VRDevice
+#[allow(dead_code)]
 pub fn new_device_id() -> u64 {
     DEVICE_ID_COUNTER.fetch_add(1, SeqCst) as u64
 }
 
 // Returns the current time in milliseconds
+#[allow(dead_code)]
 pub fn timestamp() -> f64 {
     let timespec = time::get_time();
     timespec.sec as f64 * 1000.0 + (timespec.nsec as f64 * 1e-6)

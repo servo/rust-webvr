@@ -5,6 +5,7 @@ use VRGamepadPtr;
 use VRService;
 use VRServiceCreator;
 
+#[cfg(target_os="windows")]
 #[cfg(feature = "openvr")]
 use api::OpenVRServiceCreator;
 
@@ -40,7 +41,9 @@ impl VRServiceManager {
     // Register default VR services specified in crate's features
     pub fn register_defaults(&mut self) {
         let creators: Vec<Box<VRServiceCreator>> = vec!(
-            #[cfg(feature = "openvr")] OpenVRServiceCreator::new()
+            #[cfg(feature = "openvr")]
+            #[cfg(target_os="windows")]
+            OpenVRServiceCreator::new()
         );
         
         for creator in &creators {

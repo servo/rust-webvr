@@ -1,7 +1,7 @@
 use VRDisplayData;
 
 #[allow(unused_attributes)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum VRDisplayEventReason {
     Navigation,
     // The VRDisplay has detected that the user has put it on.

@@ -244,7 +244,7 @@ pub fn main() {
     vr.register_defaults();
     // Add a mock service to allow running the demo when no VRDisplay is available.
     // If no VR service is found the demo fallbacks to the Mock.
-    //vr.register_mock();
+    vr.register_mock();
     // Intialize all registered VR Services
     vr.initialize_services();
 

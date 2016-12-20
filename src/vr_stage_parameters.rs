@@ -8,5 +8,5 @@ pub struct VRStageParameters {
     // Width of the play-area bounds in meters.
     pub size_x: f32,
     // Depth of the play-area bounds in meters
-    pub size_y: f32
+    pub size_z: f32
 }

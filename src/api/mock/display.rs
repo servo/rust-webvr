@@ -46,7 +46,7 @@ impl VRDisplay for MockVRDisplay {
             sitting_to_standing_transform: [-0.9317312, 0.0, 0.36314875, 0.0, 0.0, 0.99999994, 0.0, 0.0, -0.36314875, 
                                             0.0, -0.9317312, 0.0, 0.23767996, 1.6813644, 0.45370483, 1.0],
             size_x: 2.0,
-            size_y: 2.0
+            size_z: 2.0
         });
 
         data.left_eye_parameters.offset = [0.035949998, 0.0, 0.015];

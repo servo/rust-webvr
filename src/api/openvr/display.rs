@@ -246,13 +246,13 @@ impl OpenVRDisplay {
     fn fetch_stage_parameters(&self, data: &mut VRDisplayData) {
         // Play area size
         let mut size_x = 0f32;
-        let mut size_y = 0f32;
+        let mut size_z = 0f32;
 
         unsafe {
-            (*self.chaperone).GetPlayAreaSize.unwrap()(&mut size_x, &mut size_y);
+            (*self.chaperone).GetPlayAreaSize.unwrap()(&mut size_x, &mut size_z);
         }
 
-        if size_x > 0.0 && size_y > 0.0 {
+        if size_x > 0.0 && size_z > 0.0 {
             let matrix: openvr::HmdMatrix34_t = unsafe {
                 (*self.system).GetSeatedZeroPoseToStandingAbsoluteTrackingPose.unwrap()()
             };
@@ -260,7 +260,7 @@ impl OpenVRDisplay {
             data.stage_parameters = Some(VRStageParameters {
                 sitting_to_standing_transform: openvr_matrix34_to_array(&matrix),
                 size_x: size_x,
-                size_y: size_y
+                size_z: size_z
             });
         } else {
             
@@ -274,7 +274,7 @@ impl OpenVRDisplay {
             data.stage_parameters = Some(VRStageParameters {
                 sitting_to_standing_transform: matrix,
                 size_x: 2.0,
-                size_y: 2.0
+                size_z: 2.0
             });
         }
     }

@@ -242,32 +242,32 @@ pub fn main() {
     // Register default VRService implementations and initialize them.
     // Default VRServices are specified using cargo features.
     vr.register_defaults();
-    // Add a mock service to allow running the demo when no VR Device is available.
+    // Add a mock service to allow running the demo when no VRDisplay is available.
     // If no VR service is found the demo fallbacks to the Mock.
-    vr.register_mock();
+    //vr.register_mock();
     // Intialize all registered VR Services
     vr.initialize_services();
 
-    // Get found VR devices
-    let devices = vr.get_devices();
+    // Get found VRDisplays
+    let displays = vr.get_displays();
 
-    if devices.len() > 0 {
-        println!("Found {} VR devices: ", devices.len());
+    if displays.len() > 0 {
+        println!("Found {} VRDisplays: ", displays.len());
     } else { 
-        println!("No VR devices found");
+        println!("No VRDisplays found");
         return;
     }
 
-    // Select first device
-    let device = devices.get(0).unwrap();
+    // Select first display
+    let display = displays.get(0).unwrap();
 
-    let device_data = device.borrow().display_data();
-    println!("VR Device data: {:?}", device_data);
+    let display_data = display.borrow().data();
+    println!("VRDisplay: {:?}", display_data);
 
     use glium::{DisplayBuild, Surface};
 
-    let render_width = device_data.left_eye_parameters.render_width;
-    let render_height = device_data.left_eye_parameters.render_height;
+    let render_width = display_data.left_eye_parameters.render_width;
+    let render_height = display_data.left_eye_parameters.render_height;
     let window_width = render_width;
     let window_height = (render_height as f32 * 0.5) as u32;
 
@@ -327,7 +327,7 @@ pub fn main() {
         height: render_height
     };
 
-    let mut standing_transform = if let Some(ref stage) = device_data.stage_parameters {
+    let mut standing_transform = if let Some(ref stage) = display_data.stage_parameters {
         vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
     } else {
         // Stage parameters not avaialbe yet or unsupported
@@ -342,10 +342,10 @@ pub fn main() {
     let test_pose = false; 
 
     loop {
-        device.borrow_mut().sync_poses();
+        display.borrow_mut().sync_poses();
 
-        let device_data = device.borrow().display_data();
-        if let Some(ref stage) = device_data.stage_parameters {
+        let display_data = display.borrow().data();
+        if let Some(ref stage) = display_data.stage_parameters {
             // TODO: use event queue instead of checking this every frame
             standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap();
         }
@@ -353,7 +353,7 @@ pub fn main() {
         let mut target = ctx.draw();
         framebuffer.clear_color(0.0, 0.0, 1.0, 1.0);
 
-        let data: VRFrameData = device.borrow().synced_frame_data(near, far);
+        let data: VRFrameData = display.borrow().synced_frame_data(near, far);
 
         let (left_view_matrix, right_view_matrix) = if test_pose {
              // Calculate view transform based on pose data
@@ -364,8 +364,8 @@ pub fn main() {
                 None => Matrix4::<f32>::identity()
             };
             let view = (rotation_transform * position_transform).inverse_transform().unwrap();
-            let left_eye_to_head = vec_to_translation(&device_data.left_eye_parameters.offset);
-            let right_eye_to_head = vec_to_translation(&device_data.right_eye_parameters.offset);
+            let left_eye_to_head = vec_to_translation(&display_data.left_eye_parameters.offset);
+            let right_eye_to_head = vec_to_translation(&display_data.right_eye_parameters.offset);
             ((view * left_eye_to_head).inverse_transform().unwrap(),
              (view * right_eye_to_head).inverse_transform().unwrap())
             
@@ -400,7 +400,7 @@ pub fn main() {
             texture_id: target_texture.get_id(),
             .. Default::default()
         };
-        device.borrow_mut().submit_frame(&layer);
+        display.borrow_mut().submit_frame(&layer);
 
         // render per eye to the FBO
         target.clear_color(1.0, 0.0, 0.0, 1.0);

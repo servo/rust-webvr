@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use VRDevicePtr;
+use VRDisplayPtr;
 use VRDisplayEvent;
 use VRGamepadPtr;
 use VRService;
@@ -12,18 +12,18 @@ use api::OpenVRServiceCreator;
 #[cfg(feature = "mock")]
 use api::MockServiceCreator;
 
-// Single entry point all the VRServices and devices
+// Single entry point all the VRServices and displays
 pub struct VRServiceManager {
     initialized: bool,
     services: Vec<Box<VRService>>,
-    devices: HashMap<u64, VRDevicePtr>,
+    displays: HashMap<u64, VRDisplayPtr>,
     gamepads: HashMap<u64, VRGamepadPtr>
 }
 
 impl Drop for VRServiceManager {
      fn drop(&mut self) {
          self.gamepads.clear();
-         self.devices.clear();
+         self.displays.clear();
          self.services.clear();
      }
 }
@@ -33,7 +33,7 @@ impl VRServiceManager {
         VRServiceManager {
             initialized: false,
             services: Vec::new(),
-            devices: HashMap::new(),
+            displays: HashMap::new(),
             gamepads: HashMap::new()
         }
     }
@@ -79,14 +79,14 @@ impl VRServiceManager {
         self.initialized = true;
     }
 
-    pub fn get_devices(&mut self) -> Vec<VRDevicePtr> {
-        self.fetch_devices();
+    pub fn get_displays(&mut self) -> Vec<VRDisplayPtr> {
+        self.fetch_displays();
         let mut result = Vec::new();
-        for (_, device) in &self.devices {
-            result.push(device.clone());
+        for (_, display) in &self.displays {
+            result.push(display.clone());
         }
-        // Sort by device_id to match service initialization order
-        result.sort_by(|a, b| a.borrow().device_id().cmp(&b.borrow().device_id()));
+        // Sort by display_id to match service initialization order
+        result.sort_by(|a, b| a.borrow().id().cmp(&b.borrow().id()));
         result
     }
 
@@ -101,8 +101,8 @@ impl VRServiceManager {
         result
     }
 
-    pub fn get_device(&self, device_id: u64) -> Option<&VRDevicePtr> {
-        self.devices.get(&device_id)
+    pub fn get_display(&self, display_id: u64) -> Option<&VRDisplayPtr> {
+        self.displays.get(&display_id)
     }
 
     pub fn poll_events(&mut self) -> Vec<VRDisplayEvent> {
@@ -119,16 +119,16 @@ impl VRServiceManager {
 }
 
 impl VRServiceManager {
-    fn fetch_devices(&mut self) {
+    fn fetch_displays(&mut self) {
         self.initialize_services();
 
         for service in &mut self.services {
-            let devices = service.fetch_devices();
-            if let Ok(devices) = devices {
-                for device in devices {
-                    let key = device.borrow().device_id();
-                    if !self.devices.contains_key(&key) {
-                        self.devices.insert(key, device.clone());
+            let displays = service.fetch_displays();
+            if let Ok(displays) = displays {
+                for display in displays {
+                    let key = display.borrow().id();
+                    if !self.displays.contains_key(&key) {
+                        self.displays.insert(key, display.clone());
                     }
                 }
             }

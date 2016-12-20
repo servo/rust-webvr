@@ -1,8 +1,8 @@
-use {VRService, VRDevicePtr, VRDisplayEvent, VRGamepadPtr};
-use super::device::{MockVRDevice, MockVRDevicePtr};
+use {VRService, VRDisplayPtr, VRDisplayEvent, VRGamepadPtr};
+use super::display::{MockVRDisplay, MockVRDisplayPtr};
 
 pub struct MockVRService {
-    devices: Vec<MockVRDevicePtr>,
+    displays: Vec<MockVRDisplayPtr>,
 }
 
 unsafe impl Send for MockVRService {}
@@ -12,12 +12,12 @@ impl VRService for MockVRService {
         Ok(())
     }
 
-    fn fetch_devices(&mut self) -> Result<Vec<VRDevicePtr>,String> {
-        if self.devices.len() == 0 {
-            self.devices.push(MockVRDevice::new())
+    fn fetch_displays(&mut self) -> Result<Vec<VRDisplayPtr>,String> {
+        if self.displays.len() == 0 {
+            self.displays.push(MockVRDisplay::new())
         }
 
-        Ok(self.clone_devices())
+        Ok(self.clone_displays())
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
@@ -37,10 +37,10 @@ impl VRService for MockVRService {
 impl MockVRService {
     pub fn new() -> MockVRService {
         MockVRService {
-            devices: Vec::new(),
+            displays: Vec::new(),
         }
     }
-    fn clone_devices(&self) -> Vec<VRDevicePtr> {
-        self.devices.iter().map(|d| d.clone() as VRDevicePtr).collect()
+    fn clone_displays(&self) -> Vec<VRDisplayPtr> {
+        self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
     }
 }

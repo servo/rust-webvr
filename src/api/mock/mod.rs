@@ -1,4 +1,4 @@
-mod device;
+mod display;
 mod service;
 
 use {VRService, VRServiceCreator};

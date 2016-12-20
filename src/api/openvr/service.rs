@@ -4,19 +4,19 @@ use super::binding::EVRApplicationType::*;
 use super::binding::ETrackedDeviceClass::*;
 use super::binding::EVREventType::*;
 use super::constants;
-use super::device::{OpenVRDevice, OpenVRDevicePtr};
+use super::display::{OpenVRDisplay, OpenVRDisplayPtr};
 use super::gamepad::{OpenVRGamepad, OpenVRGamepadPtr};
 use super::library::OpenVRLibrary;
 use std::ffi::CString;
 use std::ptr;
 use std::mem;
-use {VRService, VRDevice, VRDevicePtr, VRDisplayEvent, VRDisplayEventReason, VRGamepadPtr};
+use {VRService, VRDisplay, VRDisplayPtr, VRDisplayEvent, VRDisplayEventReason, VRGamepadPtr};
 
 // OpenVR Service implementation
 pub struct OpenVRService {
     initialized: bool,
     lib: Option<OpenVRLibrary>,
-    devices: Vec<OpenVRDevicePtr>,
+    displays: Vec<OpenVRDisplayPtr>,
     gamepads: Vec<OpenVRGamepadPtr>,
     system: *mut openvr::VR_IVRSystem_FnTable,
     chaperone: *mut openvr::VR_IVRChaperone_FnTable,
@@ -80,16 +80,16 @@ impl VRService for OpenVRService {
         Ok(())
     }
 
-    fn fetch_devices(&mut self) -> Result<Vec<VRDevicePtr>,String> {
-        // Return cached devices if available
-        if self.initialized && self.devices.len() > 0 {
-            return Ok(self.clone_devices());
+    fn fetch_displays(&mut self) -> Result<Vec<VRDisplayPtr>,String> {
+        // Return cached displays if available
+        if self.initialized && self.displays.len() > 0 {
+            return Ok(self.clone_displays());
         }
         // Ensure that there are not initialization errors
         try!(self.initialize());
 
         let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
-        self.devices.clear();
+        self.displays.clear();
 
         for i in 0..max_device_count {
             let device_class: openvr::ETrackedDeviceClass = unsafe {
@@ -98,14 +98,14 @@ impl VRService for OpenVRService {
             
             match device_class {
                 ETrackedDeviceClass_TrackedDeviceClass_HMD => {
-                    self.devices.push(OpenVRDevice::new(self.lib.as_ref().unwrap(), i, self.system, self.chaperone));
+                    self.displays.push(OpenVRDisplay::new(self.lib.as_ref().unwrap(), i, self.system, self.chaperone));
                 },
                 _ => {}
             }
         }
 
 
-        Ok(self.clone_devices())
+        Ok(self.clone_displays())
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
@@ -156,44 +156,44 @@ impl VRService for OpenVRService {
 
             match event_type {
                 EVREventType_VREvent_TrackedDeviceUserInteractionStarted => {
-                    if let Some(device) = self.get_device(event.trackedDeviceIndex) {
+                    if let Some(display) = self.get_display(event.trackedDeviceIndex) {
     
-                        result.push(VRDisplayEvent::Activate(device.borrow().display_data(), 
+                        result.push(VRDisplayEvent::Activate(display.borrow().data(), 
                                                                    VRDisplayEventReason::Mounted));
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceUserInteractionEnded => {
-                    if let Some(device) = self.get_device(event.trackedDeviceIndex) {
+                    if let Some(display) = self.get_display(event.trackedDeviceIndex) {
     
-                        result.push(VRDisplayEvent::Deactivate(device.borrow().display_data(), 
+                        result.push(VRDisplayEvent::Deactivate(display.borrow().data(), 
                                                                      VRDisplayEventReason::Unmounted));
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceActivated => {
-                    if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Connect(device.borrow().display_data()))
+                    if let Some(display) = self.get_display(event.trackedDeviceIndex) {
+                        result.push(VRDisplayEvent::Connect(display.borrow().data()))
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceDeactivated => {
-                    if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Disconnect(device.borrow().device_id()))
+                    if let Some(display) = self.get_display(event.trackedDeviceIndex) {
+                        result.push(VRDisplayEvent::Disconnect(display.borrow().id()))
                     }
                 },
                 EVREventType_VREvent_DashboardActivated => {
-                    if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Blur(device.borrow().display_data()))
+                    if let Some(display) = self.get_display(event.trackedDeviceIndex) {
+                        result.push(VRDisplayEvent::Blur(display.borrow().data()))
                     }
                 },
                 EVREventType_VREvent_DashboardDeactivated => {
-                    if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Focus(device.borrow().display_data()))
+                    if let Some(display) = self.get_display(event.trackedDeviceIndex) {
+                        result.push(VRDisplayEvent::Focus(display.borrow().data()))
                     }
                 },
                 EVREventType_VREvent_ChaperoneDataHasChanged |
                 EVREventType_VREvent_IpdChanged |
                 EVREventType_VREvent_TrackedDeviceUpdated => {
-                    if let Some(device) = self.get_device(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Change(device.borrow().display_data()))
+                    if let Some(display) = self.get_display(event.trackedDeviceIndex) {
+                        result.push(VRDisplayEvent::Change(display.borrow().data()))
                     }
                 },
                 _ => {}
@@ -209,7 +209,7 @@ impl Drop for OpenVRService {
         if self.initialized {
             unsafe {
                 self.gamepads.clear();
-                self.devices.clear();
+                self.displays.clear();
                 println!("OpenVR Shutdown");
                 (*self.lib.as_ref().unwrap().shutdown_internal)();
             }
@@ -222,22 +222,22 @@ impl OpenVRService {
         OpenVRService {
             initialized: false,
             lib: None,
-            devices: Vec::new(),
+            displays: Vec::new(),
             gamepads: Vec::new(),
             system: ptr::null_mut(),
             chaperone: ptr::null_mut()
         }
     }
 
-    fn clone_devices(&self) -> Vec<VRDevicePtr> {
-        self.devices.iter().map(|d| d.clone() as VRDevicePtr).collect()
+    fn clone_displays(&self) -> Vec<VRDisplayPtr> {
+        self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
     }
 
     fn clone_gamepads(&self) -> Vec<VRGamepadPtr> {
         self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect()
     }
 
-    pub fn get_device(&self, index: openvr::TrackedDeviceIndex_t) -> Option<&OpenVRDevicePtr> {
-        self.devices.iter().find(|&d| d.borrow().index() == index)
+    pub fn get_display(&self, index: openvr::TrackedDeviceIndex_t) -> Option<&OpenVRDisplayPtr> {
+        self.displays.iter().find(|&d| d.borrow().index() == index)
     }
 }

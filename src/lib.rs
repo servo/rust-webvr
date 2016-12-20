@@ -19,7 +19,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate time;
 
-pub mod vr_device;
+pub mod vr_display;
 pub mod vr_service;
 pub mod vr_manager;
 pub mod vr_display_data;
@@ -34,7 +34,7 @@ pub mod vr_event;
 pub mod vr_field_view;
 pub mod vr_gamepad;
 
-pub use vr_device::{VRDevice,VRDevicePtr};
+pub use vr_display::{VRDisplay,VRDisplayPtr};
 pub use vr_service::{VRService,VRServiceCreator};
 pub use vr_manager::VRServiceManager;
 pub use vr_display_data::VRDisplayData;

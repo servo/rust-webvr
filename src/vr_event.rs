@@ -18,7 +18,7 @@ pub enum VRDisplayEvent {
     Connect(VRDisplayData),
 
     // Indicates that a VRDisplay has been disconnected.
-    // param: device_id
+    // param: display_id
     Disconnect(u64),
 
     // Indicates that something has occured which suggests the VRDisplay should be presented to

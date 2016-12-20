@@ -1,6 +1,6 @@
 mod binding;
 mod constants;
-mod device;
+mod display;
 mod library;
 mod gamepad;
 mod service;

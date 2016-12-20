@@ -1,5 +1,5 @@
 // The VRStageParameters interface represents the values describing the
-// stage/play area for devices that support room-scale experiences.
+// stage/play area for displays that support room-scale experiences.
 #[allow(unused_attributes)]
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct VRStageParameters {

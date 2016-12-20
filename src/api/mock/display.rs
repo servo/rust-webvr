@@ -1,40 +1,40 @@
-use {VRDevice, VRDisplayData, VRFrameData, VRStageParameters, VRLayer};
+use {VRDisplay, VRDisplayData, VRFrameData, VRStageParameters, VRLayer};
 use super::super::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
-pub type MockVRDevicePtr = Arc<RefCell<MockVRDevice>>;
+pub type MockVRDisplayPtr = Arc<RefCell<MockVRDisplay>>;
 use std::time::Duration;
 use std::thread;
 
-pub struct MockVRDevice {
-    device_id: u64
+pub struct MockVRDisplay {
+    display_id: u64
 }
 
-unsafe impl Send for MockVRDevice {}
-unsafe impl Sync for MockVRDevice {}
+unsafe impl Send for MockVRDisplay {}
+unsafe impl Sync for MockVRDisplay {}
 
-impl MockVRDevice {
-    pub fn new() -> MockVRDevicePtr {
-        Arc::new(RefCell::new(MockVRDevice {
-            device_id: utils::new_device_id(),
+impl MockVRDisplay {
+    pub fn new() -> MockVRDisplayPtr {
+        Arc::new(RefCell::new(MockVRDisplay {
+            display_id: utils::new_id(),
         }))
     }
 }
 
-impl VRDevice for MockVRDevice {
+impl VRDisplay for MockVRDisplay {
 
-    fn device_id(&self) -> u64 {
-        self.device_id
+    fn id(&self) -> u64 {
+        self.display_id
     }
 
-    fn display_data(&self) -> VRDisplayData {
+    fn data(&self) -> VRDisplayData {
         let mut data = VRDisplayData::default();
         
         // Mock display data
         // Simulates a virtual HTC Vive
 
-        data.display_name = "Mock VR Device".into();
-        data.display_id = self.device_id;
+        data.display_name = "Mock VRDisplay".into();
+        data.display_id = self.display_id;
         data.connected = true;
 
         data.capabilities.can_present = true;

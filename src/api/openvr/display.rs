@@ -15,13 +15,13 @@ use std::slice;
 use std::str;
 use std::ptr;
 use std::mem;
-use {VRDevice, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
+use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
     VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRLayer};
 
-pub type OpenVRDevicePtr = Arc<RefCell<OpenVRDevice>>;
+pub type OpenVRDisplayPtr = Arc<RefCell<OpenVRDisplay>>;
 
-pub struct OpenVRDevice {
-    device_id: u64,
+pub struct OpenVRDisplay {
+    display_id: u64,
     lib: *const OpenVRLibrary,
     index: openvr::TrackedDeviceIndex_t,
     system: *mut openvr::VR_IVRSystem_FnTable,
@@ -29,17 +29,17 @@ pub struct OpenVRDevice {
     compositor: *mut openvr::VR_IVRCompositor_FnTable
 }
 
-unsafe impl Send for OpenVRDevice {}
-unsafe impl Sync for OpenVRDevice {}
+unsafe impl Send for OpenVRDisplay {}
+unsafe impl Sync for OpenVRDisplay {}
 
-impl OpenVRDevice {
+impl OpenVRDisplay {
     pub fn new(lib: *const OpenVRLibrary,
                index: openvr::TrackedDeviceIndex_t,
                system: *mut openvr::VR_IVRSystem_FnTable,
                chaperone: *mut openvr::VR_IVRChaperone_FnTable) 
-               -> Arc<RefCell<OpenVRDevice>> {
-        Arc::new(RefCell::new(OpenVRDevice {
-            device_id: utils::new_device_id(),
+               -> Arc<RefCell<OpenVRDisplay>> {
+        Arc::new(RefCell::new(OpenVRDisplay {
+            display_id: utils::new_id(),
             lib: lib,
             index: index,
             system: system,
@@ -49,26 +49,26 @@ impl OpenVRDevice {
     }
 }
 
-impl Drop for OpenVRDevice {
+impl Drop for OpenVRDisplay {
      fn drop(&mut self) {
          self.stop_present();
      }
 }
 
-impl VRDevice for OpenVRDevice {
+impl VRDisplay for OpenVRDisplay {
 
-    fn device_id(&self) -> u64 {
-        self.device_id
+    fn id(&self) -> u64 {
+        self.display_id
     }
 
     // Returns the current display data.
-    fn display_data(&self) -> VRDisplayData {
+    fn data(&self) -> VRDisplayData {
         let mut data = VRDisplayData::default();
         
-        OpenVRDevice::fetch_capabilities(&mut data.capabilities);
+        OpenVRDisplay::fetch_capabilities(&mut data.capabilities);
         self.fetch_eye_parameters(&mut data.left_eye_parameters, &mut data.right_eye_parameters);
         self.fetch_stage_parameters(&mut data);
-        data.display_id = self.device_id;
+        data.display_id = self.display_id;
         data.display_name = format!("{} {}",
                             self.get_string_property(ETrackedDeviceProperty_Prop_ManufacturerName_String),
                             self.get_string_property(ETrackedDeviceProperty_Prop_ModelNumber_String));
@@ -83,15 +83,15 @@ impl VRDevice for OpenVRDevice {
         let mut tracked_poses: [openvr::TrackedDevicePose_t; openvr::k_unMaxTrackedDeviceCount as usize]
                               = unsafe { mem::uninitialized() };
         unsafe {
-            // Calculates updated poses for all devices
+            // Calculates updated poses for all displays
             (*self.system).GetDeviceToAbsoluteTrackingPose.unwrap()(ETrackingUniverseOrigin_TrackingUniverseSeated,
                                                                     self.get_seconds_to_photons(),
                                                                     &mut tracked_poses[0],
                                                                     openvr::k_unMaxTrackedDeviceCount);
         };
 
-        let device_pose = &tracked_poses[self.index as usize];
-        self.fetch_frame_data(near_z as f32, far_z as f32, &device_pose, &mut data);
+        let display_pose = &tracked_poses[self.index as usize];
+        self.fetch_frame_data(near_z as f32, far_z as f32, &display_pose, &mut data);
 
         data
     }
@@ -102,14 +102,14 @@ impl VRDevice for OpenVRDevice {
              self.inmediate_frame_data(near_z, far_z);
          }
 
-         let mut device_pose: openvr::TrackedDevicePose_t = unsafe { mem::uninitialized() };
+         let mut display_pose: openvr::TrackedDevicePose_t = unsafe { mem::uninitialized() };
          unsafe {
              (*self.compositor).GetLastPoseForTrackedDeviceIndex.unwrap()(self.index,
-                                                                          &mut device_pose,
+                                                                          &mut display_pose,
                                                                           ptr::null_mut());
          }
          let mut data = VRFrameData::default();
-         self.fetch_frame_data(near_z as f32, far_z as f32, &device_pose, &mut data);
+         self.fetch_frame_data(near_z as f32, far_z as f32, &display_pose, &mut data);
 
          data
       }
@@ -160,7 +160,7 @@ impl VRDevice for OpenVRDevice {
     }
 }
 
-impl OpenVRDevice {
+impl OpenVRDisplay {
     fn get_string_property(&self, name: openvr::ETrackedDeviceProperty) -> String {
         let max_size = 256;
         let result = String::with_capacity(max_size);
@@ -282,16 +282,16 @@ impl OpenVRDevice {
     fn fetch_frame_data(&self,
                         near_z: f32,
                         far_z: f32,
-                        device_pose: &openvr::TrackedDevicePose_t,
+                        display_pose: &openvr::TrackedDevicePose_t,
                         out: &mut VRFrameData) {
         let near_z = near_z as f32;
         let far_z = far_z as f32;
-        OpenVRDevice::fetch_pose(&device_pose, &mut out.pose);
+        OpenVRDisplay::fetch_pose(&display_pose, &mut out.pose);
         self.fetch_projection_matrix(EVREye_Eye_Left, near_z, far_z, &mut out.left_projection_matrix);
         self.fetch_projection_matrix(EVREye_Eye_Right, near_z, far_z, &mut out.right_projection_matrix);
 
         let mut view_matrix: [f32; 16] = unsafe { mem::uninitialized() };
-        self.fetch_view_matrix(&device_pose, &mut view_matrix);
+        self.fetch_view_matrix(&display_pose, &mut view_matrix);
 
         let mut left_eye:[f32; 16] = unsafe { mem::uninitialized() };
         let mut right_eye:[f32; 16] = unsafe { mem::uninitialized() };
@@ -326,36 +326,36 @@ impl OpenVRDevice {
         *out = openvr_matrix34_to_array(&matrix);
     }
 
-    pub fn fetch_pose(device_pose:&openvr::TrackedDevicePose_t, out:&mut VRPose) {
-        if !device_pose.bPoseIsValid {
+    pub fn fetch_pose(display_pose:&openvr::TrackedDevicePose_t, out:&mut VRPose) {
+        if !display_pose.bPoseIsValid {
             // For some reason the pose may not be valid, return a empty one
             return;
         }
 
         // OpenVR returns a transformation matrix
         // WebVR expects a quaternion, we have to decompose the transformation matrix
-        out.orientation = Some(openvr_matrix_to_quat(&device_pose.mDeviceToAbsoluteTracking));
+        out.orientation = Some(openvr_matrix_to_quat(&display_pose.mDeviceToAbsoluteTracking));
 
         // Decompose position from transformation matrix
-        out.position = Some(openvr_matrix_to_position(&device_pose.mDeviceToAbsoluteTracking));
+        out.position = Some(openvr_matrix_to_position(&display_pose.mDeviceToAbsoluteTracking));
 
         // Copy linear velocity and angular velocity
-        out.linear_velocity = Some([device_pose.vVelocity.v[0], 
-                                     device_pose.vVelocity.v[1], 
-                                     device_pose.vVelocity.v[2]]);
-        out.angular_velocity = Some([device_pose.vAngularVelocity.v[0], 
-                                      device_pose.vAngularVelocity.v[1], 
-                                      device_pose.vAngularVelocity.v[2]]);
+        out.linear_velocity = Some([display_pose.vVelocity.v[0], 
+                                     display_pose.vVelocity.v[1], 
+                                     display_pose.vVelocity.v[2]]);
+        out.angular_velocity = Some([display_pose.vAngularVelocity.v[0], 
+                                      display_pose.vAngularVelocity.v[1], 
+                                      display_pose.vAngularVelocity.v[2]]);
 
         // TODO: OpenVR doesn't expose linear and angular acceleration
         // Derive them from GetDeviceToAbsoluteTrackingPose with different predicted seconds_photons?
     }
 
-    fn fetch_view_matrix(&self, device_pose: &openvr::TrackedDevicePose_t, out: &mut [f32; 16]) {
-        if !device_pose.bPoseIsValid {
+    fn fetch_view_matrix(&self, display_pose: &openvr::TrackedDevicePose_t, out: &mut [f32; 16]) {
+        if !display_pose.bPoseIsValid {
             *out = identity_matrix!();
         } else {
-            *out = openvr_matrix34_to_array(&device_pose.mDeviceToAbsoluteTracking);
+            *out = openvr_matrix34_to_array(&display_pose.mDeviceToAbsoluteTracking);
         }
     }
 

@@ -2,7 +2,7 @@ use super::binding as openvr;
 use super::binding::ETrackingUniverseOrigin::*;
 use super::binding::EVRButtonId;
 use super::binding::EVRButtonId::*;
-use super::device::OpenVRDevice;
+use super::display::OpenVRDisplay;
 use super::super::utils;
 use std::cell::RefCell;
 use std::mem;
@@ -25,7 +25,7 @@ impl OpenVRGamepad {
                system: *mut openvr::VR_IVRSystem_FnTable)
                -> Arc<RefCell<OpenVRGamepad>> {
         Arc::new(RefCell::new(OpenVRGamepad {
-            gamepad_id: utils::new_device_id(),
+            gamepad_id: utils::new_id(),
             index: index,
             system: system
         }))
@@ -79,7 +79,7 @@ impl VRGamepad for OpenVRGamepad {
             });
         }
 
-        OpenVRDevice::fetch_pose(&pose, &mut state.pose);
+        OpenVRDisplay::fetch_pose(&pose, &mut state.pose);
 
         state
     }

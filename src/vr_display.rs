@@ -1,16 +1,16 @@
 use {VRDisplayData, VRFrameData, VRLayer};
 use std::sync::Arc;
 use std::cell::RefCell;
-pub type VRDevicePtr = Arc<RefCell<VRDevice>>;
+pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
 
-// The VRDevice traits forms the base of all VR device implementations
-pub trait VRDevice: Send + Sync {
+// The VRDisplay traits forms the base of all VR device implementations
+pub trait VRDisplay: Send + Sync {
 
     // Returns unique device identifier
-    fn device_id(&self) -> u64;
+    fn id(&self) -> u64;
 
     // Returns the current display data.
-    fn display_data(&self) -> VRDisplayData;
+    fn data(&self) -> VRDisplayData;
 
     // Returns the inmediate VRFrameData of the HMD
     // Shpuld be used when not presenting to the device.
@@ -40,8 +40,8 @@ pub trait VRDevice: Send + Sync {
     fn stop_present(&mut self) {}
 }
 
-impl PartialEq for VRDevice {
-    fn eq(&self, other: &VRDevice) -> bool {
-        self.device_id() == other.device_id()
+impl PartialEq for VRDisplay {
+    fn eq(&self, other: &VRDisplay) -> bool {
+        self.id() == other.id()
     }
 }

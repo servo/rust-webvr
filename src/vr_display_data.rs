@@ -2,8 +2,8 @@ use VRDisplayCapabilities;
 use VREyeParameters;
 use VRStageParameters;
 
-#[allow(unused_attributes)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRDisplayData {
     pub display_id: u64,
     pub display_name: String,

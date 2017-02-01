@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"
@@ -24,8 +24,8 @@ serde-serialization = ["serde", "serde_derive"]
 
 [dependencies]
 log  = "0.3"
-serde = { version = "0.8", optional = true }
-serde_derive = { version = "0.8", optional = true }
+serde = { version = "0.9", optional = true }
+serde_derive = { version = "0.9", optional = true }
 time = "0.1"
 libloading = { version = "0.3", optional = true }
 

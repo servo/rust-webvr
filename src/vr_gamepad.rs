@@ -10,8 +10,8 @@ pub trait VRGamepad {
     fn state(&self) -> VRGamepadState;
 }
 
-#[allow(unused_attributes)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRGamepadState {
     pub connected: bool,
     pub timestamp: f64,
@@ -32,8 +32,8 @@ impl Default for VRGamepadState {
      }
 }
 
-#[allow(unused_attributes)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRGamepadButton {
     pub pressed: bool,
     pub touched: bool

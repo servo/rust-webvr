@@ -2,8 +2,8 @@ use VRFieldOfView;
 
 // The VREyeParameters interface represents all the information 
 // required to correctly render a scene for a given eye.
-#[allow(unused_attributes)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VREyeParameters {
     // Offset from the center point between the users eyes to the center of the eye in meters.
     pub offset: [f32; 3],

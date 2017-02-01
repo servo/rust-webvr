@@ -1,8 +1,8 @@
 // The VRFieldOfView interface represents a field of view, 
 // as given by 4 degrees describing the view from a center point.
 
-#[allow(unused_attributes)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRFieldOfView {
     pub up_degrees: f64,
     pub right_degrees: f64,

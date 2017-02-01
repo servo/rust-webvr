@@ -1,6 +1,6 @@
 // Data provided to a VRDisplay and presented in the HMD.
-#[allow(unused_attributes)]
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRLayer {
     // Source texture whose contents will be presented by the 
     // VRDisplay when VRDisplay.submitFrame() is called.

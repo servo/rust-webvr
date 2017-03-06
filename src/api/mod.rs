@@ -12,3 +12,9 @@ pub use self::openvr::OpenVRServiceCreator;
 mod mock;
 #[cfg(feature = "mock")]
 pub use self::mock::MockServiceCreator;
+
+#[cfg(feature = "googlevr")]
+mod googlevr;
+#[cfg(feature = "googlevr")]
+pub use self::googlevr::GoogleVRServiceCreator;
+

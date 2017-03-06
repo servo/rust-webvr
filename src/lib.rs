@@ -7,6 +7,10 @@ macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);
 }
 
+#[cfg(target_os = "android")]
+extern crate android_injected_glue;
+#[cfg(feature = "googlevr")]
+extern crate gvr_sys;
 #[cfg(feature = "openvr")]
 extern crate libloading;
 #[macro_use]
@@ -17,6 +21,11 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate time;
+
+#[cfg(feature = "googlevr")]
+mod gl {
+    include!(concat!(env!("OUT_DIR"), "/gles_bindings.rs"));
+}
 
 pub mod vr_display;
 pub mod vr_service;

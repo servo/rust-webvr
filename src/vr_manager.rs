@@ -5,7 +5,12 @@ use VRGamepadPtr;
 use VRService;
 use VRServiceCreator;
 
-#[cfg(target_os="windows")]
+
+#[cfg(target_os = "android")]
+#[cfg(feature = "googlevr")]
+use api::GoogleVRServiceCreator;
+
+#[cfg(target_os = "windows")]
 #[cfg(feature = "openvr")]
 use api::OpenVRServiceCreator;
 
@@ -41,9 +46,12 @@ impl VRServiceManager {
     // Register default VR services specified in crate's features
     pub fn register_defaults(&mut self) {
         let creators: Vec<Box<VRServiceCreator>> = vec!(
+            #[cfg(target_os = "windows")]
             #[cfg(feature = "openvr")]
-            #[cfg(target_os="windows")]
-            OpenVRServiceCreator::new()
+            OpenVRServiceCreator::new(),
+            #[cfg(target_os = "android")]
+            #[cfg(feature = "openvr")]
+            GoogleVRServiceCreator::new(),
         );
         
         for creator in &creators {

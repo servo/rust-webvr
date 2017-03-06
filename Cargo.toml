@@ -16,10 +16,16 @@ exclude = [
     "examples/*",
 ]
 
+build = "build.rs"
+
+[package.metadata.android]
+package-name = "rust.webvr"
+
 [features]
-default = ["openvr", "mock"]
+default = ["openvr", "mock", "googlevr"]
 openvr = ["libloading"]
 mock = []
+googlevr = ["gvr-sys"]
 serde-serialization = ["serde", "serde_derive"]
 
 [dependencies]
@@ -28,9 +34,10 @@ serde = { version = "0.9", optional = true }
 serde_derive = { version = "0.9", optional = true }
 time = "0.1"
 libloading = { version = "0.3", optional = true }
+gvr-sys = { version = "0.3", optional = true }
 
-[dev-dependencies]
-# Only required to run examples
-glium = "0.15"
-cgmath = "0.12"
-image = "0.10"
+[target.'cfg(target_os = "android")'.dependencies]
+android_injected_glue = {git = "https://github.com/mmatyas/android-rs-injected-glue"}
+
+[build-dependencies]
+gl_generator = "0.5.0"

@@ -433,12 +433,6 @@ fn openvr_matrix_to_position(matrix: &openvr::HmdMatrix34_t) -> [f32; 3] {
 // Adapted from http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
 #[inline]
 fn openvr_matrix_to_quat(matrix: &openvr::HmdMatrix34_t) -> [f32; 4] {
-
-    /*let m4 = openvr_matrix34_to_array(&matrix);
-    let mut m = [0f32; 16];
-    utils::inverse_matrix(&m4, &mut m);
-    let m: [[f32;4]; 4] = unsafe { mem::transmute(m) };*/
-
     let m = matrix.m;
     let w = f32::max(0.0, 1.0 + m[0][0] + m[1][1] + m[2][2]).sqrt() * 0.5;
     let mut x = f32::max(0.0, 1.0 + m[0][0] - m[1][1] - m[2][2]).sqrt() * 0.5;

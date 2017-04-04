@@ -7,7 +7,7 @@ macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);
 }
 
-#[cfg(target_os = "android")]
+#[cfg(all(feature= "googlevr", target_os = "android"))]
 extern crate android_injected_glue;
 #[cfg(feature = "googlevr")]
 extern crate gvr_sys;

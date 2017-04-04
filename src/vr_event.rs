@@ -1,4 +1,11 @@
-use VRDisplayData;
+use {VRDisplayData, VRGamepadData, VRGamepadState};
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
+pub enum VREvent {
+    Display(VRDisplayEvent),
+    Gamepad(VRGamepadEvent)
+}
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
@@ -38,4 +45,29 @@ pub enum VRDisplayEvent {
 
     // Indicates that a VRDisplay has begun or ended VR presentation
     PresentChange(VRDisplayData, bool)
+}
+
+impl Into<VREvent> for VRDisplayEvent {
+    fn into(self) -> VREvent {
+        VREvent::Display(self)
+    }
+}
+
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
+pub enum VRGamepadEvent {
+    // Indicates that a VRGamepad has been connected.
+    // params: name, displa_id, state
+    Connect(VRGamepadData, VRGamepadState),
+
+    // Indicates that a VRGamepad has been disconnected.
+    // param: gamepad_id
+    Disconnect(u64)
+}
+
+impl Into<VREvent> for VRGamepadEvent {
+    fn into(self) -> VREvent {
+        VREvent::Gamepad(self)
+    }
 }

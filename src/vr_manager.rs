@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use VRDisplayPtr;
-use VRDisplayEvent;
+use VREvent;
 use VRGamepadPtr;
 use VRService;
 use VRServiceCreator;
@@ -113,7 +113,7 @@ impl VRServiceManager {
         self.displays.get(&display_id)
     }
 
-    pub fn poll_events(&mut self) -> Vec<VRDisplayEvent> {
+    pub fn poll_events(&mut self) -> Vec<VREvent> {
         let mut events = Vec::new();
         for service in &mut self.services {
             events.append(&mut service.poll_events());

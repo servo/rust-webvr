@@ -16,8 +16,6 @@ extern crate libloading;
 #[macro_use]
 extern crate log;
 #[cfg(feature = "serde-serialization")]
-extern crate serde;
-#[cfg(feature = "serde-serialization")]
 #[macro_use]
 extern crate serde_derive;
 extern crate time;
@@ -53,8 +51,8 @@ pub use vr_frame_data::VRFrameData;
 pub use vr_layer::VRLayer;
 pub use vr_pose::VRPose;
 pub use vr_stage_parameters::VRStageParameters;
-pub use vr_event::{VRDisplayEvent, VRDisplayEventReason};
+pub use vr_event::{VREvent, VRDisplayEvent, VRDisplayEventReason, VRGamepadEvent};
 pub use vr_field_view::VRFieldOfView;
-pub use vr_gamepad::{VRGamepad, VRGamepadPtr, VRGamepadState, VRGamepadButton};
+pub use vr_gamepad::{VRGamepad, VRGamepadPtr, VRGamepadData, VRGamepadState, VRGamepadButton};
 
 pub mod api;

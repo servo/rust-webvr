@@ -1,5 +1,5 @@
 use VRDisplayPtr;
-use VRDisplayEvent;
+use VREvent;
 use VRGamepadPtr;
 
 pub trait VRService: Send {
@@ -11,7 +11,7 @@ pub trait VRService: Send {
 
     fn is_available(&self) -> bool;
 
-    fn poll_events(&self) -> Vec<VRDisplayEvent>;
+    fn poll_events(&self) -> Vec<VREvent>;
 }
 
 pub trait VRServiceCreator {

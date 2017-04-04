@@ -1,6 +1,6 @@
 #![cfg(feature = "googlevr")]
 
-use {VRService, VRDisplayPtr, VRDisplayEvent, VRGamepadPtr};
+use {VRService, VRDisplay, VRDisplayPtr, VREvent, VRGamepadPtr};
 use super::display::{GoogleVRDisplay, GoogleVRDisplayPtr};
 use super::gamepad::{GoogleVRGamepad, GoogleVRGamepadPtr};
 #[cfg(target_os="android")]
@@ -68,7 +68,11 @@ impl VRService for GoogleVRService {
         try!(self.initialize());
 
         let gamepad = unsafe {
-            try!(GoogleVRGamepad::new(self.controller_ctx))
+            let display_id = match self.displays.first() {
+                Some(display) => display.borrow().id(),
+                None => 0
+            };
+            try!(GoogleVRGamepad::new(self.controller_ctx, display_id))
         };
         self.gamepads.push(gamepad);
         
@@ -79,7 +83,7 @@ impl VRService for GoogleVRService {
         true   
     }
 
-    fn poll_events(&self) -> Vec<VRDisplayEvent> {
+    fn poll_events(&self) -> Vec<VREvent> {
         Vec::new()
     }
 }

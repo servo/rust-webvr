@@ -5,7 +5,6 @@ use VRGamepadPtr;
 use VRService;
 use VRServiceCreator;
 
-
 #[cfg(target_os = "android")]
 #[cfg(feature = "googlevr")]
 use api::GoogleVRServiceCreator;
@@ -50,7 +49,7 @@ impl VRServiceManager {
             #[cfg(feature = "openvr")]
             OpenVRServiceCreator::new(),
             #[cfg(target_os = "android")]
-            #[cfg(feature = "openvr")]
+            #[cfg(feature = "googlevr")]
             GoogleVRServiceCreator::new(),
         );
         

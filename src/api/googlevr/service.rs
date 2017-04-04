@@ -72,7 +72,7 @@ impl VRService for GoogleVRService {
                 Some(display) => display.borrow().id(),
                 None => 0
             };
-            try!(GoogleVRGamepad::new(self.controller_ctx, display_id))
+            try!(GoogleVRGamepad::new(self.ctx, self.controller_ctx, display_id))
         };
         self.gamepads.push(gamepad);
         

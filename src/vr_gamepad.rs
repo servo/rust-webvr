@@ -36,16 +36,26 @@ impl Default for VRGamepadState {
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
+pub enum VRGamepadHand {
+    Unknown,
+    Left,
+    Right
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRGamepadData {
     pub display_id: u64,
-    pub name: String
+    pub name: String,
+    pub hand: VRGamepadHand
 }
 
 impl Default for VRGamepadData {
      fn default() -> VRGamepadData {
          Self {
             display_id: 0,
-            name: String::new()
+            name: String::new(),
+            hand: VRGamepadHand::Unknown
          }
      }
 }

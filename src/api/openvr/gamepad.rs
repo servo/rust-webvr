@@ -7,7 +7,7 @@ use super::super::utils;
 use std::cell::RefCell;
 use std::mem;
 use std::sync::Arc;
-use {VRGamepad, VRGamepadData, VRGamepadState, VRGamepadButton};
+use {VRGamepad, VRGamepadData, VRGamepadHand, VRGamepadState, VRGamepadButton};
 
 pub type OpenVRGamepadPtr = Arc<RefCell<OpenVRGamepad>>;
 
@@ -47,7 +47,8 @@ impl VRGamepad for OpenVRGamepad {
     fn data(&self) -> VRGamepadData {
         VRGamepadData {
             display_id: self.display_id,
-            name: format!("OpenVR {:?}", self.index)
+            name: format!("OpenVR {:?}", self.index),
+            hand: VRGamepadHand::Unknown
         }
     }
     

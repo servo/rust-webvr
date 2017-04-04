@@ -1,6 +1,6 @@
 #![cfg(feature = "googlevr")]
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
-    VREyeParameters, VRFrameData, VRPose, VRLayer};
+    VREyeParameters, VRFrameData, VRLayer};
 use super::service::GoogleVRService;
 use super::super::utils;
 #[cfg(target_os="android")]
@@ -16,6 +16,11 @@ use std::ptr;
 use std::mem;
 
 pub type GoogleVRDisplayPtr = Arc<RefCell<GoogleVRDisplay>>;
+
+// 50ms is a good estimate recommended by the GVR Team.
+// It takes in account the time between frame submission (without vsync) and 
+// when the rendered image is sent to the physical pixels on the display.
+const PREDICTION_OFFSET_NANOS: i64 = 50000000; // 50ms
 
 pub struct GoogleVRDisplay {
     service: *const GoogleVRService,
@@ -106,6 +111,12 @@ impl VRDisplay for GoogleVRDisplay {
         }
 
         unsafe {
+            if !self.frame.is_null() {
+                warn!("submit_frame not called");
+                // Release acquired frame is the user has not called submit_Frame()
+                gvr::gvr_frame_submit(mem::transmute(&self.frame), self.viewport_list, self.synced_head_matrix);
+            }
+
             gvr::gvr_get_recommended_buffer_viewports(self.ctx, self.viewport_list);
             // Handle resize
             let size = self.recommended_render_size();
@@ -119,13 +130,15 @@ impl VRDisplay for GoogleVRDisplay {
 
         // Predict head matrix
         let mut time = unsafe { gvr::gvr_get_time_point_now() };
-        let prediction = 1000000; // TODO: average times to get a better value.
-        time.monotonic_system_time_nanos += prediction;
+        time.monotonic_system_time_nanos += PREDICTION_OFFSET_NANOS;
         self.synced_head_matrix = self.fetch_head_matrix(&time);
     }
 
     fn submit_frame(&mut self, layer: &VRLayer) {
-        debug_assert!(!self.frame.is_null());
+        if self.frame.is_null() {
+            warn!("null frame wiht context");
+            return;
+        }
         debug_assert!(self.fbo_id > 0);
 
         unsafe {
@@ -333,7 +346,10 @@ impl GoogleVRDisplay {
         let right_eye = unsafe { gvr::gvr_get_eye_from_head_matrix(self.ctx, gvr::gvr_eye::GVR_RIGHT_EYE as i32) };
 
         // Convert gvr matrices to rust slices.
-        let view_matrix = gvr_mat4_to_array(&head_matrix);
+        let head_matrix = gvr_mat4_to_array(&head_matrix);
+        let mut view_matrix:[f32; 16] = unsafe { mem::uninitialized() };
+        utils::inverse_matrix(&head_matrix, &mut view_matrix);
+
         let left_eye = gvr_mat4_to_array(&left_eye);
         let right_eye = gvr_mat4_to_array(&right_eye);
 
@@ -346,6 +362,8 @@ impl GoogleVRDisplay {
         let right_fov = unsafe { gvr::gvr_buffer_viewport_get_source_fov(self.right_eye_vp) };
         out.left_projection_matrix = fov_to_projection_matrix(&left_fov, near, far);
         out.right_projection_matrix = fov_to_projection_matrix(&right_fov, near, far);
+
+        out.pose.orientation = Some(utils::matrix_to_quat(&view_matrix));
 
         // Timestamp
         out.timestamp = utils::timestamp();
@@ -373,10 +391,10 @@ impl Drop for GoogleVRDisplay {
 
 #[inline]
 fn gvr_mat4_to_array(matrix: &gvr::gvr_mat4f) -> [f32; 16] {
-    [matrix.m[0][0], matrix.m[1][0], matrix.m[2][0], matrix.m[3][0],
-     matrix.m[0][1], matrix.m[1][1], matrix.m[2][1], matrix.m[3][1],
-     matrix.m[0][2], matrix.m[1][2], matrix.m[2][2], matrix.m[3][2],
-     matrix.m[0][3], matrix.m[1][3], matrix.m[2][3], matrix.m[3][3]]
+    [matrix.m[0][0], matrix.m[0][1], matrix.m[0][2], matrix.m[0][3],
+     matrix.m[1][0], matrix.m[1][1], matrix.m[1][2], matrix.m[1][3],
+     matrix.m[2][0], matrix.m[2][1], matrix.m[2][2], matrix.m[2][3],
+     matrix.m[3][0], matrix.m[3][1], matrix.m[3][2], matrix.m[3][3]]
 }
 
 #[inline]

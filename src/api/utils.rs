@@ -108,3 +108,28 @@ fn determinant3x3(a1: f32, a2: f32, a3: f32, b1: f32, b2: f32, b3: f32, c1: f32,
 fn determinant2x2(a: f32, b: f32, c: f32, d: f32) -> f32 {
     a * d - b * c
 }
+
+// Adapted from http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
+#[inline]
+pub fn matrix_to_quat(matrix: &[f32; 16]) -> [f32; 4] {
+    let m: &[[f32; 4]; 4] = unsafe { mem::transmute(matrix) };
+    let w = f32::max(0.0, 1.0 + m[0][0] + m[1][1] + m[2][2]).sqrt() * 0.5;
+    let mut x = f32::max(0.0, 1.0 + m[0][0] - m[1][1] - m[2][2]).sqrt() * 0.5;
+    let mut y = f32::max(0.0, 1.0 - m[0][0] + m[1][1] - m[2][2]).sqrt() * 0.5;
+    let mut z = f32::max(0.0, 1.0 - m[0][0] - m[1][1] + m[2][2]).sqrt() * 0.5;
+
+    x = copysign(x, m[1][2] - m[2][1]);
+    y = copysign(y, m[2][0] - m[0][2]);
+    z = copysign(z, m[0][1] - m[1][0]);
+
+    [x, y, z, w]
+}
+
+#[inline]
+pub fn copysign(a: f32, b: f32) -> f32 {
+    if b == 0.0 {
+        0.0
+    } else {
+        a.abs() * b.signum()
+    }
+}

@@ -40,8 +40,6 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
                 gvrLayout.setPresentationView(new View(activity));
                 AndroidCompat.setVrModeEnabled(activity, true);
 
-                start();
-
                 // Wait until completed
                 synchronized(this) {
                     this.notify();
@@ -130,7 +128,7 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
             return;
         }
         if (mPresenting && gvrLayout != null && !mGvrResumed) {
-            gvrLayout.onResume();
+            //gvrLayout.onResume();
             mGvrResumed = true;
         }
     }
@@ -140,8 +138,9 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
         if (activity != mActivity) {
             return;
         }
+
         if (mPresenting && gvrLayout != null && mGvrResumed) {
-            gvrLayout.onPause();
+            //gvrLayout.onPause();
             mGvrResumed = false;
         }
     }

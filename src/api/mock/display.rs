@@ -77,9 +77,9 @@ impl VRDisplay for MockVRDisplay {
         data.pose.orientation = Some([0.9385081, -0.08066622, -0.3347714, 0.024972256]);
 
         // Simulates HTC Vive projections
-        data.left_projection_matrix = [0.75620246, 0.0, 0.0, 0.0, 0.0, 
-                                       0.68050665, 0.0, 0.0, -0.05713458, 
-                                      -0.0021225351, -1.0000999, -1.0, 
+        data.left_projection_matrix = [0.75620246, 0.0, 0.0, 0.0,
+                                       0.0, 0.68050665, 0.0, 0.0,
+                                      -0.05713458, -0.0021225351, -1.0000999, -1.0, 
                                        0.0, 0.0, -0.10000999, 0.0];
 
         data.left_view_matrix = [1.0, 0.0, 0.0, 0.0, 

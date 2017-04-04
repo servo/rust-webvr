@@ -1,4 +1,4 @@
-use {VRService, VRDisplayPtr, VRDisplayEvent, VRGamepadPtr};
+use {VRService, VRDisplayPtr, VREvent, VRGamepadPtr};
 use super::display::{MockVRDisplay, MockVRDisplayPtr};
 
 pub struct MockVRService {
@@ -28,7 +28,7 @@ impl VRService for MockVRService {
         true   
     }
 
-    fn poll_events(&self) -> Vec<VRDisplayEvent> {
+    fn poll_events(&self) -> Vec<VREvent> {
         // TODO: fake mock events
         Vec::new()
     }

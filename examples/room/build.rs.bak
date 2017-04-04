@@ -1,0 +1,65 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+use std::env;
+use std::path::Path;
+use std::process;
+use std::process::{Command, Stdio};
+
+fn main() {
+    // build.rs is not platform-specific, so we have to check the target here.
+    env::set_var("CC", "arm-linux-androideabi");
+    panic!("aaaa");
+}
+
+fn android_main() {
+
+    // Get the NDK path from NDK_HOME env.
+    let ndk_path = env::var("ANDROID_NDK").ok().expect("Please set the ANDROID_NDK environment variable");
+    let ndk_path = Path::new(&ndk_path);
+
+    // Build up the path to the NDK compilers
+    // Options for host are:  "linux-x86_64" "linux-x86" "darwin-x86_64" "darwin-x86"
+    // per: https://android.googlesource.com/platform/ndk/+/ics-mr0/docs/STANDALONE-TOOLCHAIN.html
+
+    let host = env::var("HOST").unwrap();
+    let google_host = match host.as_ref() {
+        "i686-unknown-linux-gnu" => "linux-x86",
+        "x86_64-apple-darwin" => "darwin-x86_64",
+        "x86_64-unknown-linux-gnu" => "linux-x86_64",
+        _ => panic!("Unknown support android cross-compile host: {}", host)
+    };
+
+    let target = env::var("TARGET").unwrap();
+
+    let arch = if target.contains("arm") {
+        "arch-arm"
+    } else if target.contains("x86") {
+        "arch-x86"
+    } else if target.contains("mips") {
+        "arch-mips"
+    } else {
+        panic!("Invalid target architecture {}", target);
+    };
+
+    let toolchain_name = match target.as_ref() {
+        "armv7-linux-androideabi" => "arm-linux-androideabi",
+         t => t
+    };
+
+    let toolchain_path = ndk_path.join("toolchains").join(toolchain_name).join("-4.9").join("prebuilt").
+                         join(google_host).join("bin");
+    let sys_root = ndk_path.join("platforms").join("android-18").join(arch);
+    let support_include = ndk_path.join("sources").join("android").join("support").join("include");
+
+    env::set_var("PATH", format!("{}:{}", env::var("PATH").unwrap(), toolchain_path.to_str().unwrap()));
+    env::set_var("CFLAGS", format!("--sysroot {} -I{}", sys_root.to_str().unwrap(), support_include.to_str().unwrap()));
+    env::set_var("CXXFLAGS", format!("--sysroot {} -I{}", sys_root.to_str().unwrap(), support_include.to_str().unwrap()));
+    env::set_var("CC", format!("{}-gcc", toolchain_name));
+    env::set_var("CPP", format!("{}-gcc", toolchain_name));
+    env::set_var("CXX", format!("{}-g++", toolchain_name));
+    env::set_var("AR", format!("{}-ar", toolchain_name));
+
+    panic!("Test {}", env::var("CC").unwrap());
+}

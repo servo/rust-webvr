@@ -1,0 +1,164 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 25
+    buildToolsVersion "25.0.2"
+
+    defaultConfig {
+        applicationId "com.rust.webvr"
+        minSdkVersion 21
+        targetSdkVersion 25
+        versionCode 1
+        versionName "1.0.0"
+        jackOptions {
+            enabled true
+        }
+    }
+
+    compileOptions {
+        incremental false
+    }
+
+    splits {
+        density {
+            enable false
+        }
+        abi {
+            enable false
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java']
+            assets.srcDirs = ['../../res']
+        }
+        armDebug {
+            jniLibs.srcDirs = getJniLibsPath(true, 'arm')
+        }
+        armRelease {
+            jniLibs.srcDirs = getJniLibsPath(false, 'arm')
+        }
+        armv7Debug {
+            jniLibs.srcDirs = getJniLibsPath(true, 'armv7')
+        }
+        armv7Release {
+            jniLibs.srcDirs = getJniLibsPath(false, 'armv7')
+        }
+    }
+
+    buildTypes {
+        // Default debug and release build types are used as templates
+        debug {
+            jniDebuggable true
+        }
+
+        release {
+            debuggable true
+            signingConfig signingConfigs.debug // Change this to sign with a production key
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+
+        // Custom build types
+        armDebug {
+            initWith(debug)
+            ndk {
+                abiFilters getNDKAbi('arm')
+            }
+        }
+        armRelease {
+            initWith(release)
+            ndk {
+                abiFilters getNDKAbi('arm')
+            }
+        }
+        armv7Debug {
+            initWith(debug)
+            ndk {
+                abiFilters getNDKAbi('armv7')
+            }
+        }
+        armv7Release {
+            initWith(release)
+            ndk {
+                abiFilters getNDKAbi('armv7')
+            }
+        }
+    }
+
+    // Ignore default 'debug' and 'release' build types
+    variantFilter { variant ->
+        if(variant.buildType.name.equals('release') || variant.buildType.name.equals('debug')) {
+            variant.setIgnore(true);
+        }
+    }
+    
+    // Define apk output directory
+    applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            def name = variant.buildType.name
+            output.outputFile = new File(getApkPath(isDebug(name), getArch(name)))
+        }
+    }
+}
+
+task appStart(type: Exec, dependsOn: 'installArmRelease') {
+    // linux
+    commandLine 'adb', 'shell', 'am', 'start', '-n', 'com.rust.webvr/.MainActivity'
+
+    // windows
+    // commandLine 'cmd', '/c', 'adb', 'shell', 'am', 'start', '-n', 'com.example/.MyActivity'
+}
+
+dependencies {
+    compile 'com.google.vr:sdk-base:1.30.0'
+    compile 'com.google.vr:sdk-audio:1.30.0'
+    compile project(':GVRService')
+}
+
+
+String getArch(String buildType) {
+    return buildType.replaceAll(/(Debug|Release)/, '')
+}
+
+
+boolean isDebug(String buildType) {
+    return buildType.contains("Debug")
+}
+
+String getTargetDir(boolean debug, String arch) {
+    def basePath = project.rootDir.getParentFile().absolutePath
+    return basePath + '/target/' + getRustTarget(arch) + '/' + (debug ? 'debug' : 'release')
+}
+
+String getApkPath(boolean debug, String arch) {
+    return getTargetDir(debug, arch) + '/servo.apk'
+}
+
+def getJniLibsPath(boolean debug, String arch) {
+    return [
+        getTargetDir(debug, arch) + "/libs",
+        "../libs"
+    ]
+}
+
+String getRustTarget(String arch) {
+    switch (arch.toLowerCase()) {
+        case 'arm' : return 'arm-linux-androideabi'
+        case 'armv7' : return 'armv7-linux-androideabi'
+        case 'arm64' : return 'aarch64-linux-android'
+        case 'x86' : return 'x86'
+        default: throw new GradleException("Invalid target architecture " + arch)
+    }
+}
+
+String getNDKAbi(String arch) {
+    switch (arch.toLowerCase()) {
+        case 'arm' : return 'armeabi'
+        case 'armv7' : return 'armeabi-v7a'
+        case 'arm64' : return 'arm64-v8a'
+        case 'x86' : return 'x86'
+        default: throw new GradleException("Invalid target architecture " + arch)
+    }
+}

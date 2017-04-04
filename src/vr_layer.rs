@@ -13,6 +13,9 @@ pub struct VRLayer {
     // UVs defining the texture bounds to present to the eye in UV space: [x,y,w,h]
     // Defaults to [0.5, 0.0, 0.5, 1.0]
     pub right_bounds: [f32; 4],
+
+    // Hint with texture size
+    pub texture_size: Option<(u32, u32)>,
 }
 
 impl Default for VRLayer {
@@ -20,7 +23,8 @@ impl Default for VRLayer {
         VRLayer {
             texture_id: 0,
             left_bounds: [0.0, 0.0, 0.5, 1.0],
-            right_bounds: [0.5, 0.0, 0.5, 1.0]
+            right_bounds: [0.5, 0.0, 0.5, 1.0],
+            texture_size : None
         }
     }
 }

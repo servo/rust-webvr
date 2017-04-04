@@ -1,0 +1,4 @@
+rootProject.name = 'RoomScaleDemo'
+include ':app'
+include ':GVRService'
+project(':GVRService').projectDir = new File('../../../src/api/googlevr/gradle')

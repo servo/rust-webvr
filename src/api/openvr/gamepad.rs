@@ -7,12 +7,13 @@ use super::super::utils;
 use std::cell::RefCell;
 use std::mem;
 use std::sync::Arc;
-use {VRGamepad, VRGamepadState, VRGamepadButton};
+use {VRGamepad, VRGamepadData, VRGamepadState, VRGamepadButton};
 
 pub type OpenVRGamepadPtr = Arc<RefCell<OpenVRGamepad>>;
 
 pub struct OpenVRGamepad {
     gamepad_id: u64,
+    display_id: u64,
     index: openvr::TrackedDeviceIndex_t,
     system: *mut openvr::VR_IVRSystem_FnTable
 }
@@ -22,13 +23,19 @@ unsafe impl Sync for OpenVRGamepad {}
 
 impl OpenVRGamepad {
     pub fn new(index: openvr::TrackedDeviceIndex_t,
-               system: *mut openvr::VR_IVRSystem_FnTable)
+               system: *mut openvr::VR_IVRSystem_FnTable,
+               display_id: u64)
                -> Arc<RefCell<OpenVRGamepad>> {
         Arc::new(RefCell::new(OpenVRGamepad {
             gamepad_id: utils::new_id(),
+            display_id: display_id,
             index: index,
             system: system
         }))
+    }
+
+    pub fn index(&self) -> openvr::TrackedDeviceIndex_t {
+        self.index
     }
 }
 
@@ -37,13 +44,17 @@ impl VRGamepad for OpenVRGamepad {
         self.gamepad_id
     }
 
-    fn name(&self) -> String {
-        format!("OpenVR {:?}", self.index)
+    fn data(&self) -> VRGamepadData {
+        VRGamepadData {
+            display_id: self.display_id,
+            name: format!("OpenVR {:?}", self.index)
+        }
     }
-
+    
     fn state(&self) -> VRGamepadState {
         let mut state = VRGamepadState::default();
 
+        state.gamepad_id = self.gamepad_id;
         let mut controller: openvr::VRControllerState_t = unsafe { mem::uninitialized() };
         let mut tracked_poses: [openvr::TrackedDevicePose_t; openvr::k_unMaxTrackedDeviceCount as usize]
                               = unsafe { mem::uninitialized() };

@@ -10,7 +10,8 @@ use super::library::OpenVRLibrary;
 use std::ffi::CString;
 use std::ptr;
 use std::mem;
-use {VRService, VRDisplay, VRDisplayPtr, VRDisplayEvent, VRDisplayEventReason, VRGamepadPtr};
+use {VRService, VRDisplay, VRDisplayPtr, VREvent, VRDisplayEvent, VRDisplayEventReason,
+    VRGamepadEvent, VRGamepad, VRGamepadPtr};
 
 // OpenVR Service implementation
 pub struct OpenVRService {
@@ -118,6 +119,11 @@ impl VRService for OpenVRService {
         let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
         self.gamepads.clear();
 
+        let display_id = match self.displays.first() {
+            Some(display) => display.borrow().id(),
+            None => 0
+        };
+
         for i in 0..max_device_count {
             let device_class: openvr::ETrackedDeviceClass = unsafe {
                 (*self.system).GetTrackedDeviceClass.unwrap()(i as openvr::TrackedDeviceIndex_t)
@@ -125,7 +131,7 @@ impl VRService for OpenVRService {
 
             match device_class {
                 ETrackedDeviceClass_TrackedDeviceClass_Controller => {
-                    self.gamepads.push(OpenVRGamepad::new(i, self.system));
+                    self.gamepads.push(OpenVRGamepad::new(i, self.system, display_id));
                 },
                 _ => {}
             }
@@ -143,7 +149,7 @@ impl VRService for OpenVRService {
         }
     }
 
-    fn poll_events(&self) -> Vec<VRDisplayEvent> {
+    fn poll_events(&self) -> Vec<VREvent> {
         let mut result = Vec::new();
         if !self.initialized || self.system.is_null() {
             return result;
@@ -157,43 +163,49 @@ impl VRService for OpenVRService {
             match event_type {
                 EVREventType_VREvent_TrackedDeviceUserInteractionStarted => {
                     if let Some(display) = self.get_display(event.trackedDeviceIndex) {
-    
                         result.push(VRDisplayEvent::Activate(display.borrow().data(), 
-                                                                   VRDisplayEventReason::Mounted));
+                                                             VRDisplayEventReason::Mounted)
+                                                             .into());
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceUserInteractionEnded => {
                     if let Some(display) = self.get_display(event.trackedDeviceIndex) {
-    
                         result.push(VRDisplayEvent::Deactivate(display.borrow().data(), 
-                                                                     VRDisplayEventReason::Unmounted));
+                                                               VRDisplayEventReason::Unmounted)
+                                                               .into());
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceActivated => {
                     if let Some(display) = self.get_display(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Connect(display.borrow().data()))
+                        result.push(VRDisplayEvent::Connect(display.borrow().data()).into())
+                    }
+                    else if let Some(gamepad) = self.get_gamepad(event.trackedDeviceIndex) {
+                        result.push(VRGamepadEvent::Connect(gamepad.borrow().state()).into());
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceDeactivated => {
                     if let Some(display) = self.get_display(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Disconnect(display.borrow().id()))
+                        result.push(VRDisplayEvent::Disconnect(display.borrow().id()).into())
+                    }
+                    else if let Some(gamepad) = self.get_gamepad(event.trackedDeviceIndex) {
+                        result.push(VRGamepadEvent::Disconnect(gamepad.borrow().id()).into());
                     }
                 },
                 EVREventType_VREvent_DashboardActivated => {
                     if let Some(display) = self.get_display(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Blur(display.borrow().data()))
+                        result.push(VRDisplayEvent::Blur(display.borrow().data()).into())
                     }
                 },
                 EVREventType_VREvent_DashboardDeactivated => {
                     if let Some(display) = self.get_display(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Focus(display.borrow().data()))
+                        result.push(VRDisplayEvent::Focus(display.borrow().data()).into())
                     }
                 },
                 EVREventType_VREvent_ChaperoneDataHasChanged |
                 EVREventType_VREvent_IpdChanged |
                 EVREventType_VREvent_TrackedDeviceUpdated => {
                     if let Some(display) = self.get_display(event.trackedDeviceIndex) {
-                        result.push(VRDisplayEvent::Change(display.borrow().data()))
+                        result.push(VRDisplayEvent::Change(display.borrow().data()).into())
                     }
                 },
                 _ => {}
@@ -239,5 +251,9 @@ impl OpenVRService {
 
     pub fn get_display(&self, index: openvr::TrackedDeviceIndex_t) -> Option<&OpenVRDisplayPtr> {
         self.displays.iter().find(|&d| d.borrow().index() == index)
+    }
+
+    pub fn get_gamepad(&self, index: openvr::TrackedDeviceIndex_t) -> Option<&OpenVRGamepadPtr> {
+        self.gamepads.iter().find(|&d| d.borrow().index() == index)
     }
 }

@@ -33,10 +33,10 @@ pub trait VRDisplay: Send + Sync {
     // Must be called in the render thread
     fn submit_frame(&mut self, layer: &VRLayer);
 
-    // Hint to indicate that we are goig to start sending frames to the device
+    // Hint to indicate that we are going to start sending frames to the device
     fn start_present(&mut self) {}
 
-    // Hint to indicate that we are goig to stop sending frames to the device
+    // Hint to indicate that we are going to stop sending frames to the device
     fn stop_present(&mut self) {}
 }
 

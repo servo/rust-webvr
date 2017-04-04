@@ -355,7 +355,7 @@ fn matrix_to_uniform<'a>(matrix:&'a Mat4) -> &'a[f32; 16] {
 }
 
 fn vec_to_quaternion(raw: &[f32; 4]) -> Quaternion<f32> {
-    Quaternion::new(raw[0], raw[1], raw[2], raw[3])
+    Quaternion::new(raw[3], raw[0], raw[1], raw[2])
 }
 
 fn vec_to_translation(raw: &[f32; 3]) -> Mat4 {

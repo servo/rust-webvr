@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"
@@ -22,7 +22,7 @@ build = "build.rs"
 package-name = "rust.webvr"
 
 [features]
-default = ["openvr", "mock", "googlevr"]
+default = ["openvr", "mock"]
 openvr = ["libloading"]
 mock = []
 googlevr = ["gvr-sys"]

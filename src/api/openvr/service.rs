@@ -180,7 +180,8 @@ impl VRService for OpenVRService {
                         result.push(VRDisplayEvent::Connect(display.borrow().data()).into())
                     }
                     else if let Some(gamepad) = self.get_gamepad(event.trackedDeviceIndex) {
-                        result.push(VRGamepadEvent::Connect(gamepad.borrow().state()).into());
+                        let g = gamepad.borrow();
+                        result.push(VRGamepadEvent::Connect(g.data(), g.state()).into());
                     }
                 },
                 EVREventType_VREvent_TrackedDeviceDeactivated => {

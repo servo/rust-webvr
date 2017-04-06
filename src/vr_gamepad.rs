@@ -5,7 +5,7 @@ use VRPose;
 pub type VRGamepadPtr = Arc<RefCell<VRGamepad>>;
 
 pub trait VRGamepad {
-    fn id(&self) -> u64;
+    fn id(&self) -> u32;
     fn data(&self) -> VRGamepadData;
     fn state(&self) -> VRGamepadState;
 }
@@ -13,7 +13,7 @@ pub trait VRGamepad {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRGamepadState {
-    pub gamepad_id: u64,
+    pub gamepad_id: u32,
     pub connected: bool,
     pub timestamp: f64,
     pub axes: Vec<f64>,
@@ -45,7 +45,7 @@ pub enum VRGamepadHand {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRGamepadData {
-    pub display_id: u64,
+    pub display_id: u32,
     pub name: String,
     pub hand: VRGamepadHand
 }

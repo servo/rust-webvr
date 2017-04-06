@@ -7,7 +7,7 @@ pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
 pub trait VRDisplay: Send + Sync {
 
     // Returns unique device identifier
-    fn id(&self) -> u64;
+    fn id(&self) -> u32;
 
     // Returns the current display data.
     fn data(&self) -> VRDisplayData;

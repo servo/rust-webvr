@@ -21,7 +21,7 @@ use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
 pub type OpenVRDisplayPtr = Arc<RefCell<OpenVRDisplay>>;
 
 pub struct OpenVRDisplay {
-    display_id: u64,
+    display_id: u32,
     lib: *const OpenVRLibrary,
     index: openvr::TrackedDeviceIndex_t,
     system: *mut openvr::VR_IVRSystem_FnTable,
@@ -57,7 +57,7 @@ impl Drop for OpenVRDisplay {
 
 impl VRDisplay for OpenVRDisplay {
 
-    fn id(&self) -> u64 {
+    fn id(&self) -> u32 {
         self.display_id
     }
 

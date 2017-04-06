@@ -12,8 +12,8 @@ use {VRGamepad, VRGamepadData, VRGamepadHand, VRGamepadState, VRGamepadButton};
 pub type OpenVRGamepadPtr = Arc<RefCell<OpenVRGamepad>>;
 
 pub struct OpenVRGamepad {
-    gamepad_id: u64,
-    display_id: u64,
+    gamepad_id: u32,
+    display_id: u32,
     index: openvr::TrackedDeviceIndex_t,
     system: *mut openvr::VR_IVRSystem_FnTable
 }
@@ -24,7 +24,7 @@ unsafe impl Sync for OpenVRGamepad {}
 impl OpenVRGamepad {
     pub fn new(index: openvr::TrackedDeviceIndex_t,
                system: *mut openvr::VR_IVRSystem_FnTable,
-               display_id: u64)
+               display_id: u32)
                -> Arc<RefCell<OpenVRGamepad>> {
         Arc::new(RefCell::new(OpenVRGamepad {
             gamepad_id: utils::new_id(),
@@ -40,7 +40,7 @@ impl OpenVRGamepad {
 }
 
 impl VRGamepad for OpenVRGamepad {
-    fn id(&self) -> u64 {
+    fn id(&self) -> u32 {
         self.gamepad_id
     }
 

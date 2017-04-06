@@ -20,8 +20,8 @@ use api::MockServiceCreator;
 pub struct VRServiceManager {
     initialized: bool,
     services: Vec<Box<VRService>>,
-    displays: HashMap<u64, VRDisplayPtr>,
-    gamepads: HashMap<u64, VRGamepadPtr>
+    displays: HashMap<u32, VRDisplayPtr>,
+    gamepads: HashMap<u32, VRGamepadPtr>
 }
 
 impl Drop for VRServiceManager {
@@ -108,7 +108,7 @@ impl VRServiceManager {
         result
     }
 
-    pub fn get_display(&self, display_id: u64) -> Option<&VRDisplayPtr> {
+    pub fn get_display(&self, display_id: u32) -> Option<&VRDisplayPtr> {
         self.displays.get(&display_id)
     }
 

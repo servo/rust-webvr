@@ -7,8 +7,8 @@ static DEVICE_ID_COUNTER: AtomicUsize  = ATOMIC_USIZE_INIT;
 
 // Generates a unique identifier for any VRDisplay
 #[allow(dead_code)]
-pub fn new_id() -> u64 {
-    DEVICE_ID_COUNTER.fetch_add(1, SeqCst) as u64
+pub fn new_id() -> u32 {
+    DEVICE_ID_COUNTER.fetch_add(1, SeqCst) as u32
 }
 
 // Returns the current time in milliseconds

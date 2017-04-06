@@ -26,7 +26,7 @@ pub enum VRDisplayEvent {
 
     // Indicates that a VRDisplay has been disconnected.
     // param: display_id
-    Disconnect(u64),
+    Disconnect(u32),
 
     // Indicates that something has occured which suggests the VRDisplay should be presented to
     Activate(VRDisplayData, VRDisplayEventReason),
@@ -63,7 +63,7 @@ pub enum VRGamepadEvent {
 
     // Indicates that a VRGamepad has been disconnected.
     // param: gamepad_id
-    Disconnect(u64)
+    Disconnect(u32)
 }
 
 impl Into<VREvent> for VRGamepadEvent {

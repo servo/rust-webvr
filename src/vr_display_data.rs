@@ -5,7 +5,7 @@ use VRStageParameters;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRDisplayData {
-    pub display_id: u64,
+    pub display_id: u32,
     pub display_name: String,
     pub connected: bool,
     pub capabilities: VRDisplayCapabilities,

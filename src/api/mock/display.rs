@@ -7,7 +7,7 @@ use std::time::Duration;
 use std::thread;
 
 pub struct MockVRDisplay {
-    display_id: u64
+    display_id: u32
 }
 
 unsafe impl Send for MockVRDisplay {}
@@ -23,7 +23,7 @@ impl MockVRDisplay {
 
 impl VRDisplay for MockVRDisplay {
 
-    fn id(&self) -> u64 {
+    fn id(&self) -> u32 {
         self.display_id
     }
 

@@ -2,28 +2,28 @@ package com.rust.webvr;
 
 import android.app.Activity;
 import android.app.Application;
-import android.graphics.Color;
-import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.FrameLayout.LayoutParams;
 
 import com.google.vr.ndk.base.AndroidCompat;
 import com.google.vr.ndk.base.GvrLayout;
-import com.google.vr.sdk.base.Eye;
 
 class GVRService  implements Application.ActivityLifecycleCallbacks {
     private Activity mActivity;
     private GvrLayout gvrLayout;
+    private long mPtr = 0; // Native Rustlang struct pointer
     private boolean mPresenting = false;
     private boolean mGvrResumed = false;
 
-    void init(final Activity activity) {
+    private static native void nativeOnPause(long ptr);
+    private static native void nativeOnResume(long ptr);
+
+    void init(final Activity activity, long ptr) {
         mActivity = activity;
-        activity.getApplication().registerActivityLifecycleCallbacks(this);
+        mPtr = ptr;
 
         Runnable initGvr = new Runnable() {
             @Override
@@ -39,6 +39,8 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
                 }
                 gvrLayout.setPresentationView(new View(activity));
                 AndroidCompat.setVrModeEnabled(activity, true);
+
+                activity.getApplication().registerActivityLifecycleCallbacks(GVRService.this);
 
                 // Wait until completed
                 synchronized(this) {
@@ -105,9 +107,9 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
     }
 
     // Called from JNI
-    public static Object create(Activity activity) {
+    public static Object create(Activity activity, long ptr) {
         GVRService service = new GVRService();
-        service.init(activity);
+        service.init(activity, ptr);
         return service;
     }
 
@@ -128,8 +130,9 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
             return;
         }
         if (mPresenting && gvrLayout != null && !mGvrResumed) {
-            //gvrLayout.onResume();
+            gvrLayout.onResume();
             mGvrResumed = true;
+            nativeOnResume(mPtr);
         }
     }
 
@@ -140,8 +143,9 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
         }
 
         if (mPresenting && gvrLayout != null && mGvrResumed) {
-            //gvrLayout.onPause();
+            gvrLayout.onPause();
             mGvrResumed = false;
+            nativeOnPause(mPtr);
         }
     }
 

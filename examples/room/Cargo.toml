@@ -17,3 +17,6 @@ android_injected_glue = {git = "https://github.com/mmatyas/android-rs-injected-g
 [dependencies.rust-webvr]
 path = "../.."
 
+[replace]
+"glutin:0.7.4" = { path = "/home/mortimer/Projects/push/glutin" }
+"winit:0.5.11" = { path = "/home/mortimer/Projects/push/winit_old/winit" }

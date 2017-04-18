@@ -17,8 +17,10 @@ pub struct GoogleVRGamepad {
     ctx: *mut gvr::gvr_context,
     controller_ctx: *mut gvr::gvr_controller_context,
     state: *mut gvr::gvr_controller_state,
-    gamepad_id: u64,
-    display_id: u64
+    gamepad_id: u32,
+    display_id: u32,
+    paused: bool,
+    system_paused: bool,
 }
 
 unsafe impl Send for GoogleVRGamepad {}
@@ -27,14 +29,16 @@ unsafe impl Sync for GoogleVRGamepad {}
 impl GoogleVRGamepad {
     pub unsafe fn new(ctx: *mut gvr::gvr_context,
                       controller_ctx: *mut gvr::gvr_controller_context,
-                      display_id: u64)
+                      display_id: u32)
                       -> Result<Arc<RefCell<GoogleVRGamepad>>, String> {
         let gamepad = Self {
             ctx: ctx,
             controller_ctx: controller_ctx,
             state: gvr::gvr_controller_state_create(),
             gamepad_id: utils::new_id(),
-            display_id: display_id
+            display_id: display_id,
+            paused: false,
+            system_paused: false,
         };
         gvr::gvr_controller_state_update(controller_ctx, 0, gamepad.state);
         let api_status = gvr::gvr_controller_state_get_api_status(gamepad.state);
@@ -44,6 +48,35 @@ impl GoogleVRGamepad {
         }
 
         Ok(Arc::new(RefCell::new(gamepad)))
+    }
+
+    // Warning: this function is called from java Main thread
+    // The action it's handled in handle_events method for thread safety
+    #[allow(dead_code)]
+    pub fn pause(&mut self) {
+        self.system_paused = true;
+    }
+
+    // Warning: this function is called from java Main thread
+    // The action it's handled in handle_events method for thread safety
+    #[allow(dead_code)]
+    pub fn resume(&mut self) {
+        self.system_paused = false;
+    }
+
+    pub fn handle_events(&mut self) {
+        if self.system_paused == self.paused {
+            return;
+        }
+        self.paused = self.system_paused;
+        unsafe {
+            if self.paused {
+                gvr::gvr_controller_pause(self.controller_ctx);
+            }
+            else {
+                gvr::gvr_controller_resume(self.controller_ctx);
+            }
+        }
     }
 }
 
@@ -56,7 +89,7 @@ impl Drop for GoogleVRGamepad {
 }
 
 impl VRGamepad for GoogleVRGamepad {
-    fn id(&self) -> u64 {
+    fn id(&self) -> u32 {
         self.gamepad_id
     }
 

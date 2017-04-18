@@ -1,6 +1,6 @@
 #![cfg(feature = "googlevr")]
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
-    VREyeParameters, VRFrameData, VRLayer};
+    VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer};
 use super::service::GoogleVRService;
 use super::super::utils;
 #[cfg(target_os="android")]
@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::cell::RefCell;
 use std::ptr;
 use std::mem;
+use std::sync::Mutex;
 
 pub type GoogleVRDisplayPtr = Arc<RefCell<GoogleVRDisplay>>;
 
@@ -34,8 +35,12 @@ pub struct GoogleVRDisplay {
     synced_head_matrix: gvr::gvr_mat4f,
     fbo_id: u32,
     fbo_texture: u32,
-    display_id: u64,
+    display_id: u32,
     presenting: bool,
+    paused: bool,
+    new_events_hint: bool,
+    pending_events: Mutex<Vec<VREvent>>,
+    processed_events: Mutex<Vec<VREvent>>
 }
 
 unsafe impl Send for GoogleVRDisplay {}
@@ -43,7 +48,7 @@ unsafe impl Sync for GoogleVRDisplay {}
 
 impl VRDisplay for GoogleVRDisplay {
 
-    fn id(&self) -> u64 {
+    fn id(&self) -> u32 {
         self.display_id
     }
 
@@ -100,6 +105,7 @@ impl VRDisplay for GoogleVRDisplay {
     }
 
     fn sync_poses(&mut self) {
+        self.handle_events();
         if !self.presenting {
             self.start_present();
         }
@@ -113,7 +119,7 @@ impl VRDisplay for GoogleVRDisplay {
         unsafe {
             if !self.frame.is_null() {
                 warn!("submit_frame not called");
-                // Release acquired frame is the user has not called submit_Frame()
+                // Release acquired frame if the user has not called submit_Frame()
                 gvr::gvr_frame_submit(mem::transmute(&self.frame), self.viewport_list, self.synced_head_matrix);
             }
 
@@ -132,14 +138,16 @@ impl VRDisplay for GoogleVRDisplay {
         let mut time = unsafe { gvr::gvr_get_time_point_now() };
         time.monotonic_system_time_nanos += PREDICTION_OFFSET_NANOS;
         self.synced_head_matrix = self.fetch_head_matrix(&time);
+        //println!("sync_poses");
     }
 
     fn submit_frame(&mut self, layer: &VRLayer) {
         if self.frame.is_null() {
-            warn!("null frame wiht context");
+            warn!("null frame with context");
             return;
         }
         debug_assert!(self.fbo_id > 0);
+        //println!("submit_frame");
 
         unsafe {
             // Save current fbo to restore it when the frame is submitted.
@@ -259,7 +267,11 @@ impl GoogleVRDisplay {
             fbo_id: 0,
             fbo_texture: 0,
             display_id: utils::new_id(),
-            presenting: false
+            presenting: false,
+            paused: false,
+            new_events_hint: false,
+            pending_events: Mutex::new(Vec::new()),
+            processed_events: Mutex::new(Vec::new())
         }))
     }
 
@@ -363,10 +375,91 @@ impl GoogleVRDisplay {
         out.left_projection_matrix = fov_to_projection_matrix(&left_fov, near, far);
         out.right_projection_matrix = fov_to_projection_matrix(&right_fov, near, far);
 
-        out.pose.orientation = Some(utils::matrix_to_quat(&view_matrix));
+        out.pose.orientation = Some(utils::matrix_to_quat(&head_matrix));
 
         // Timestamp
         out.timestamp = utils::timestamp();
+    }
+
+    // Warning: this function is called from java Main thread
+    // Use mutexes to ensure thread safety and process the event in sync with the render loop.
+    #[allow(dead_code)]
+    pub fn pause(&mut self) {
+        let mut pending = self.pending_events.lock().unwrap();
+        pending.push(VRDisplayEvent::Pause(self.display_id).into());
+
+        self.new_events_hint = true;
+    }
+
+    // Warning: this function is called from java Main thread
+    // Use mutexes to ensure thread safety and process the event in sync with the render loop.
+    #[allow(dead_code)]
+    pub fn resume(&mut self) {
+        let mut pending = self.pending_events.lock().unwrap();
+        pending.push(VRDisplayEvent::Resume(self.display_id).into());
+
+        self.new_events_hint = true;
+    }
+
+    fn handle_events(&mut self) {
+        if !self.new_events_hint {
+            // Optimization to avoid mutex locks every frame
+            // It doesn't matter if events are processed in the next loop iteration
+            return;
+        }
+        
+        let mut pending: Vec<VREvent> = {
+            let mut pending_events = self.pending_events.lock().unwrap();
+            self.new_events_hint = false;
+            let res = (*pending_events).drain(..).collect();
+            res
+        };
+        
+
+        for event in &pending {
+            match *event {
+                VREvent::Display(ref ev) => {
+                    self.handle_display_event(&ev);
+                },
+                _ => {}
+            }
+        }
+
+        let mut processed = self.processed_events.lock().unwrap();
+        processed.extend(pending.drain(..));
+    }
+
+    fn handle_display_event(&mut self, event: &VRDisplayEvent) {
+        match *event {
+            VRDisplayEvent::Pause(_) => {
+                if self.paused {
+                    return;
+                }
+                unsafe {
+                    gvr::gvr_pause_tracking(self.ctx);
+                }
+                self.paused = true;
+            },
+            VRDisplayEvent::Resume(_) => {
+                if !self.paused {
+                    return;
+                }
+                unsafe {
+                    gvr::gvr_resume_tracking(self.ctx);
+                    // Very important to call refresh after a resume event.
+                    // If not called GvrLayout java view shows a black screen
+                    gvr::gvr_refresh_viewer_profile(self.ctx);
+                }
+                self.paused = false;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn poll_events(&mut self, out: &mut Vec<VREvent>) {
+        self.handle_events();
+        let mut processed = self.processed_events.lock().unwrap();
+        out.extend(processed.drain(..));
     }
 }
 

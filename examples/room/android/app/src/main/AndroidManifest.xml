@@ -10,6 +10,7 @@
 
     <application android:label="rust-webvr" android:icon="@mipmap/servo">
         <activity android:name=".MainActivity"
+                android:launchMode="singleTop"
                 android:label="rust-webvr"
                 android:screenOrientation="landscape"
                 android:configChanges="orientation|keyboardHidden|screenSize"

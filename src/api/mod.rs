@@ -17,4 +17,5 @@ pub use self::mock::MockServiceCreator;
 mod googlevr;
 #[cfg(feature = "googlevr")]
 pub use self::googlevr::GoogleVRServiceCreator;
-
+#[cfg(all(feature = "googlevr", target_os= "android"))]
+pub use self::googlevr::jni::*;

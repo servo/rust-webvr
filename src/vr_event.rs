@@ -4,7 +4,7 @@ use {VRDisplayData, VRGamepadData, VRGamepadState};
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub enum VREvent {
     Display(VRDisplayEvent),
-    Gamepad(VRGamepadEvent)
+    Gamepad(VRGamepadEvent),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -44,7 +44,16 @@ pub enum VRDisplayEvent {
     Focus(VRDisplayData),
 
     // Indicates that a VRDisplay has begun or ended VR presentation
-    PresentChange(VRDisplayData, bool)
+    PresentChange(VRDisplayData, bool),
+
+    // Indicates that VRDisplay presentation loop must be paused (i.e Android app goes to background)
+    Pause(u32),
+
+    // Indicates that VRDisplay presentation loop must be resumed (i.e Android app goes to foreground)
+    Resume(u32),
+
+    // Indicates that user has exited VRDisplay presentation (i.e. User clicked back key on android)
+    Exit(u32)
 }
 
 impl Into<VREvent> for VRDisplayEvent {

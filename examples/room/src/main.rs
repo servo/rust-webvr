@@ -571,7 +571,7 @@ pub fn main() {
         debug_assert_eq!(gl.get_error(), gl::NO_ERROR);
 
         // We don't need to swap buffer on Android because Daydream view is on top of the window.
-        if cfg!(target_os = "android") {
+        if !cfg!(target_os = "android") {
             window.swap_buffers().unwrap();
         }
 
@@ -597,6 +597,11 @@ pub fn main() {
             }
             if !suspended {
                 break;
+            }
+
+            // Poll events when suspended
+            for event in vr.poll_events() {
+                println!("VR Event: {:?}", event);
             }
         }
     }

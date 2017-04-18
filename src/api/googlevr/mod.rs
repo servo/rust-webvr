@@ -20,3 +20,11 @@ impl VRServiceCreator for GoogleVRServiceCreator {
          Box::new(service::GoogleVRService::new())
      }
 }
+
+// Export functions called from Java
+#[cfg(target_os="android")]
+pub mod jni {
+    pub use super::service::Java_com_rust_webvr_GVRService_nativeOnPause;
+    pub use super::service::Java_com_rust_webvr_GVRService_nativeOnResume;
+}
+

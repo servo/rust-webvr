@@ -11,7 +11,6 @@ use gvr_sys as gvr;
 use std::mem;
 use std::ptr;
 
-
 #[cfg(target_os="android")]
 const SERVICE_CLASS_NAME:&'static str = "com/rust/webvr/GVRService";
 
@@ -84,7 +83,14 @@ impl VRService for GoogleVRService {
     }
 
     fn poll_events(&self) -> Vec<VREvent> {
-        Vec::new()
+        let mut events = Vec::new();
+        for display in &self.displays {
+            display.borrow_mut().poll_events(&mut events);
+        }
+        for gamepad in &self.gamepads {
+            gamepad.borrow_mut().handle_events();
+        }
+        events
     }
 }
 
@@ -130,8 +136,9 @@ impl GoogleVRService {
         self.java_class = (jni.NewGlobalRef)(env, self.java_class);
 
         // Create GVRService instance and own it as a globalRef.
-        let method = jni_scope.get_method(self.java_class, "create", "(Landroid/app/Activity;)Ljava/lang/Object;", true);
-        self.java_object = (jni.CallStaticObjectMethod)(env, self.java_class, method, jni_scope.activity);
+        let method = jni_scope.get_method(self.java_class, "create", "(Landroid/app/Activity;J)Ljava/lang/Object;", true);
+        let thiz: usize = mem::transmute(self as * mut GoogleVRService);
+        self.java_object = (jni.CallStaticObjectMethod)(env, self.java_class, method, jni_scope.activity, thiz as ndk::jlong);
         if self.java_object.is_null() {
             return Err("Failed to create GVRService instance".into());
         };
@@ -172,6 +179,38 @@ impl GoogleVRService {
         self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect()
     }
 
+    // Called from Java main thread
+    // Pause & resume methods are thread safe
+    #[cfg(target_os="android")]
+    fn on_pause(&mut self) {
+        for display in &self.displays {
+            unsafe {
+                (*display.as_ptr()).pause();
+            }
+        }
+
+        for gamepad in &self.gamepads {
+            unsafe {
+                (*gamepad.as_ptr()).pause();
+            }
+        }
+    }
+
+    // Called from Java main thread
+    // Pause & resume methods are thread safe
+    #[cfg(target_os="android")]
+    fn on_resume(&mut self) {
+        for display in &self.displays {
+            unsafe {
+                (*display.as_ptr()).resume();
+            }
+        }
+        for gamepad in &self.gamepads {
+            unsafe {
+                (*gamepad.as_ptr()).resume();
+            }
+        }
+    }
 }
 
 impl Drop for GoogleVRService {
@@ -187,5 +226,28 @@ impl Drop for GoogleVRService {
                 gvr::gvr_destroy(mem::transmute(&self.ctx));
             }
         }
+    }
+}
+
+
+#[cfg(target_os="android")]
+#[no_mangle]
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+pub extern fn Java_com_rust_webvr_GVRService_nativeOnPause(_: *mut ndk::JNIEnv, service: ndk::jlong) {
+    unsafe {
+        let service: *mut GoogleVRService = mem::transmute(service as usize);
+        (*service).on_pause();
+    }
+}
+
+#[cfg(target_os="android")]
+#[no_mangle]
+#[allow(non_snake_case)]
+#[allow(dead_code)]
+pub extern fn Java_com_rust_webvr_GVRService_nativeOnResume(_: *mut ndk::JNIEnv, service: ndk::jlong) {
+    unsafe {
+        let service: *mut GoogleVRService = mem::transmute(service as usize);
+        (*service).on_resume();
     }
 }

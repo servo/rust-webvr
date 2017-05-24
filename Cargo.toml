@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"
@@ -33,7 +33,7 @@ log  = "0.3"
 serde = { version = "0.9", optional = true }
 serde_derive = { version = "0.9", optional = true }
 time = "0.1"
-libloading = { version = "0.3", optional = true }
+libloading = { version = "0.4", optional = true, default-features = false }
 gvr-sys = { version = "0.3", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]

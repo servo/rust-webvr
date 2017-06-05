@@ -3,7 +3,7 @@
 mod display;
 mod gamepad;
 mod service;
-mod jni_utils;
+use super::jni_utils;
 
 use {VRService, VRServiceCreator};
 

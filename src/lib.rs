@@ -3,7 +3,8 @@ macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);
 }
 
-#[cfg(all(feature= "googlevr", target_os = "android"))]
+#[cfg(any(feature = "googlevr", feature= "oculusvr"))]
+#[cfg(target_os = "android")]
 extern crate android_injected_glue;
 #[cfg(feature = "googlevr")]
 extern crate gvr_sys;
@@ -11,6 +12,8 @@ extern crate gvr_sys;
 extern crate libloading;
 #[macro_use]
 extern crate log;
+#[cfg(feature = "oculusvr")]
+extern crate ovr_mobile_sys;
 #[cfg(feature = "serde-serialization")]
 #[macro_use]
 extern crate serde_derive;

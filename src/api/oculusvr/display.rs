@@ -3,18 +3,28 @@
 
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
     VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer};
+use android_injected_glue;
 use ovr_mobile_sys as ovr;
 use ovr_mobile_sys::ovrSystemProperty::*;
 use std::sync::Arc;
 use std::cell::RefCell;
+use std::ptr;
 use super::service::OculusVRService;
 use super::super::utils;
 
 pub type OculusVRDisplayPtr = Arc<RefCell<OculusVRDisplay>>;
 
+extern {
+    fn eglGetCurrentContext() -> *mut ::std::os::raw::c_void;
+    fn eglGetCurrentDisplay() -> *mut ::std::os::raw::c_void;
+}
+
 pub struct OculusVRDisplay {
     display_id: u32,
+    ovr: *mut ovr::ovrMobile,
     ovr_java: *const ovr::ovrJava,
+    resumed: bool,
+    frame_index: i64,
 }
 
 unsafe impl Send for OculusVRDisplay {}
@@ -44,18 +54,33 @@ impl VRDisplay for OculusVRDisplay {
 
     fn inmediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
+
+        if self.is_in_vr_mode() {
+			let tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, 0.0) };
+            self.fetch_frame_data(&tracking, &mut data, near as f32, far as f32);
+        }
         
         data
     }
 
     fn synced_frame_data(&self, near: f64, far: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
-        
+
+        if self.is_in_vr_mode() {
+            let prediction = unsafe { ovr::vrapi_GetPredictedDisplayTime(self.ovr, self.frame_index) };
+			let tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, prediction) };
+            self.fetch_frame_data(&tracking, &mut data, near as f32, far as f32);
+        }
+
         data
     }
 
     fn reset_pose(&mut self) {
-
+        if self.is_in_vr_mode() {
+            unsafe {
+                ovr::vrapi_RecenterPose(self.ovr);
+            }
+        }
     }
 
     fn sync_poses(&mut self) {
@@ -65,22 +90,57 @@ impl VRDisplay for OculusVRDisplay {
     fn submit_frame(&mut self, layer: &VRLayer) {
         
     }
+
+    fn start_present(&mut self) {
+        if !self.ovr.is_null() {
+            return;
+        }
+        
+        let mut mode = ovr::helpers::vrapi_DefaultModeParms(self.ovr_java);
+        mode.Flags |= ovr::ovrModeFlags::VRAPI_MODE_FLAG_NATIVE_WINDOW as u32;
+        mode.WindowSurface = unsafe { android_injected_glue::get_native_window() as u64 };
+        mode.Display = unsafe { eglGetCurrentDisplay() as u64 };
+        mode.ShareContext = unsafe { eglGetCurrentContext() as u64 };
+
+        self.ovr = unsafe { ovr::vrapi_EnterVrMode(&mode) };
+
+        if self.ovr.is_null() {
+            error!("Entering VR mode failed because the ANativeWindow was not valid.");
+        }
+    }
+
+    fn stop_present(&mut self) {
+        if !self.ovr.is_null() {
+            return;
+        }
+        unsafe {
+            ovr::vrapi_LeaveVrMode(self.ovr);
+        }
+        self.ovr = ptr::null_mut();
+    }
 }
 
 impl OculusVRDisplay {
     pub unsafe fn new(ovr_java: *const ovr::ovrJava) -> Arc<RefCell<OculusVRDisplay>> {
         Arc::new(RefCell::new(OculusVRDisplay {
             display_id: utils::new_id(),
+            ovr: ptr::null_mut(),
             ovr_java: ovr_java,
+            resumed: false,
+            frame_index: 0,
         }))
     }
 
-    pub fn pause(&self) {
-
+    pub fn pause(&mut self) {
+        self.resumed = false;
     }
 
-    pub fn resume(&self) {
+    pub fn resume(&mut self) {
+        self.resumed = true;
+    }
 
+    fn is_in_vr_mode(&self) -> bool {
+        self.resumed && !self.ovr.is_null()
     }
 
     fn fetch_capabilities(&self, capabilities: &mut VRDisplayCapabilities) {
@@ -127,21 +187,29 @@ impl OculusVRDisplay {
         (w as u32, h as u32)
     }
 
-    unsafe fn fetch_frame_data(&self,
-                               out: &mut VRFrameData,
-                               near: f32,
-                               far: f32) {
+    fn fetch_frame_data(&self,
+                        tracking: &ovr::ovrTracking,
+                        out: &mut VRFrameData,
+                        near: f32,
+                        far: f32) {
         let fov_x = unsafe {
             ovr::vrapi_GetSystemPropertyFloat(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X)
         };
         let fov_y = unsafe {
             ovr::vrapi_GetSystemPropertyFloat(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_Y)
         };
+
+        // Projection Matrix
         let projection = ovr::helpers::ovrMatrix4f_CreateProjectionFov(fov_x, fov_y, 0.0, 0.0, near, far);
         let projection = ovr_mat4_to_array(&projection);
 
         out.left_projection_matrix = projection;
         out.right_projection_matrix = projection;
+
+        // View Matrix
+        let model_params = ovr::helpers::vrapi_DefaultHeadModelParms();
+        let tracking = ovr::helpers::vrapi_ApplyHeadModel(&model_params, tracking);
+        
 
         // Timestamp
         out.timestamp = utils::timestamp();

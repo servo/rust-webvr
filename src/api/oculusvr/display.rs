@@ -5,6 +5,7 @@ use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
     VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer};
 use android_injected_glue;
 use ovr_mobile_sys as ovr;
+use ovr_mobile_sys::ovrFrameLayerEye::*;
 use ovr_mobile_sys::ovrSystemProperty::*;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -44,9 +45,8 @@ impl VRDisplay for OculusVRDisplay {
         data.connected = true;
     
         self.fetch_capabilities(&mut data.capabilities);
-        unsafe {
-            self.fetch_eye_parameters(&mut data.left_eye_parameters, &mut data.right_eye_parameters);
-        }
+        self.fetch_eye_parameters(&mut data.left_eye_parameters, &mut data.right_eye_parameters);
+        
         data.stage_parameters = None;
 
         data
@@ -150,7 +150,7 @@ impl OculusVRDisplay {
         capabilities.has_position = false;
     }
 
-    unsafe fn fetch_eye_parameters(&self, left_eye: &mut VREyeParameters, right_eye: &mut VREyeParameters) {
+    fn fetch_eye_parameters(&self, left_eye: &mut VREyeParameters, right_eye: &mut VREyeParameters) {
         let fov_x = unsafe {
             ovr::vrapi_GetSystemPropertyFloat(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X)
         };
@@ -210,9 +210,26 @@ impl OculusVRDisplay {
         let model_params = ovr::helpers::vrapi_DefaultHeadModelParms();
         let tracking = ovr::helpers::vrapi_ApplyHeadModel(&model_params, tracking);
         
+        let center_matrix = ovr::helpers::vrapi_GetCenterEyeViewMatrix(&model_params, &tracking, None);
+        let left_eye_view_matrix = ovr::helpers::vrapi_GetEyeViewMatrix(&model_params,
+                                                                        &center_matrix,
+                                                                        VRAPI_FRAME_LAYER_EYE_LEFT as i32);
+        let right_eye_view_matrix = ovr::helpers::vrapi_GetEyeViewMatrix(&model_params,
+                                                                         &center_matrix,
+                                                                         VRAPI_FRAME_LAYER_EYE_RIGHT as i32);
+        out.left_view_matrix = ovr_mat4_to_array(&left_eye_view_matrix);
+        out.right_view_matrix = ovr_mat4_to_array(&right_eye_view_matrix);
+
+        // Pose
+        out.pose.orientation = Some(ovr_quat_to_array(&tracking.HeadPose.Pose.Orientation));
+        out.pose.position = Some(ovr_vec3_to_array(&tracking.HeadPose.Pose.Position));
+        out.pose.linear_velocity = Some(ovr_vec3_to_array(&tracking.HeadPose.LinearVelocity));
+        out.pose.linear_acceleration = Some(ovr_vec3_to_array(&tracking.HeadPose.LinearAcceleration));
+        out.pose.angular_velocity = Some(ovr_vec3_to_array(&tracking.HeadPose.AngularVelocity));
+        out.pose.angular_acceleration = Some(ovr_vec3_to_array(&tracking.HeadPose.AngularAcceleration));
 
         // Timestamp
-        out.timestamp = utils::timestamp();
+        out.timestamp = tracking.HeadPose.TimeInSeconds * 1000.0;
     }
 }
 
@@ -223,3 +240,14 @@ fn ovr_mat4_to_array(matrix: &ovr::ovrMatrix4f) -> [f32; 16] {
      matrix.M[0][2], matrix.M[1][2], matrix.M[2][2], matrix.M[3][2],
      matrix.M[0][3], matrix.M[1][3], matrix.M[2][3], matrix.M[3][3]]
 }
+
+#[inline]
+fn ovr_quat_to_array(q: &ovr::ovrQuatf) -> [f32; 4] {
+    [q.x, q.y, q.z, q.w]
+}
+
+#[inline]
+fn ovr_vec3_to_array(v: &ovr::ovrVector3f) -> [f32; 3] {
+    [v.x, v.y, v.z]
+}
+

@@ -21,8 +21,9 @@ public class MainActivity extends android.app.NativeActivity {
     private static final String LOGTAG = "WebVRExample";
 
     static {
-        System.loadLibrary("gvr");
-        System.loadLibrary("gvr_audio");
+        //System.loadLibrary("gvr");
+        //System.loadLibrary("gvr_audio");
+        System.loadLibrary("vrapi");
         System.loadLibrary("webvr");
     }
 

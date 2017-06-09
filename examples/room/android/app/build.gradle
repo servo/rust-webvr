@@ -28,6 +28,13 @@ android {
         }
     }
 
+    productFlavors {
+        daydream {
+        }
+        gearvr {
+        }
+    }
+
     sourceSets {
         main {
             java.srcDirs = ['src/main/java']
@@ -112,9 +119,10 @@ task appStart(type: Exec, dependsOn: 'installArmRelease') {
 }
 
 dependencies {
-    compile 'com.google.vr:sdk-base:1.30.0'
-    compile 'com.google.vr:sdk-audio:1.30.0'
-    compile project(':GVRService')
+    daydreamCompile 'com.google.vr:sdk-base:1.30.0'
+    daydreamCompile 'com.google.vr:sdk-audio:1.30.0'
+    daydreamCompile project(':GVRService')
+    gearvrCompile project(':OVRService')
 }
 
 
@@ -129,6 +137,7 @@ boolean isDebug(String buildType) {
 
 String getTargetDir(boolean debug, String arch) {
     def basePath = project.rootDir.getParentFile().absolutePath
+    debug = false;
     return basePath + '/target/' + getRustTarget(arch) + '/' + (debug ? 'debug' : 'release')
 }
 

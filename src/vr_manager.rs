@@ -13,6 +13,10 @@ use api::GoogleVRServiceCreator;
 #[cfg(feature = "openvr")]
 use api::OpenVRServiceCreator;
 
+#[cfg(target_os = "android")]
+#[cfg(feature = "oculusvr")]
+use api::OculusVRServiceCreator;
+
 #[cfg(feature = "mock")]
 use api::MockServiceCreator;
 
@@ -51,6 +55,9 @@ impl VRServiceManager {
             #[cfg(target_os = "android")]
             #[cfg(feature = "googlevr")]
             GoogleVRServiceCreator::new(),
+            #[cfg(target_os = "android")]
+            #[cfg(feature = "oculusvr")]
+            OculusVRServiceCreator::new(),
         );
         
         for creator in &creators {

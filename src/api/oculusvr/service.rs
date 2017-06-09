@@ -179,6 +179,11 @@ impl OculusVRService {
 
 impl Drop for OculusVRService {
     fn drop(&mut self) {
+        if self.is_initialized() {
+            unsafe {
+                ovr::vrapi_Shutdown();
+            }
+        }
     }
 }
 

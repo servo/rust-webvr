@@ -46,7 +46,7 @@ impl VRService for OculusVRService {
 
         // Ensure that there are not initialization errors
         try!(self.initialize());
-        let display = unsafe { OculusVRDisplay::new(&self.ovr_java as *const _) };
+        let display = OculusVRDisplay::new(&self.ovr_java as *const _);
         self.displays.push(display);
 
         Ok(self.clone_displays())
@@ -119,8 +119,6 @@ impl OculusVRService {
         self.java_object = (jni.NewGlobalRef)(env, self.java_object);
 
         // Initialize native VrApi
-        let activity: &ndk::ANativeActivity = mem::transmute(android::get_app().activity);
-
         self.ovr_java.Vm = mem::transmute(&mut (*jni_scope.vm).functions);
         self.ovr_java.Env = mem::transmute(&mut (*env).functions);
         self.ovr_java.ActivityObject = (jni.NewGlobalRef)(env, jni_scope.activity) as *mut _;

@@ -121,9 +121,9 @@ impl OculusVRService {
         // Initialize native VrApi
         let activity: &ndk::ANativeActivity = mem::transmute(android::get_app().activity);
 
-        self.ovr_java.Vm = mem::transmute(&mut (*activity.vm).functions);
-        self.ovr_java.Env = mem::transmute(&mut (*activity.env).functions);
-        self.ovr_java.ActivityObject = activity.clazz as *mut _;
+        self.ovr_java.Vm = mem::transmute(&mut (*jni_scope.vm).functions);
+        self.ovr_java.Env = mem::transmute(&mut (*env).functions);
+        self.ovr_java.ActivityObject = (jni.NewGlobalRef)(env, jni_scope.activity) as *mut _;
 
         let init_params = ovr::helpers::vrapi_DefaultInitParms(&self.ovr_java);
         let status = ovr::vrapi_Initialize(&init_params);

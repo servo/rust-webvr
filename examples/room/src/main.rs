@@ -52,8 +52,8 @@ const VERTEX_SHADER_MVP: &'static str = r#"
 "#;
 
 const FRAGMENT_SHADER: &'static str = r#"
+    precision highp float;
     uniform sampler2D sampler;
-
     in vec2 v_uv;
     out vec4 color;
 
@@ -63,6 +63,7 @@ const FRAGMENT_SHADER: &'static str = r#"
 "#;
 
 const FRAGMENT_SHADER2: &'static str = r#"
+    precision highp float;
     uniform sampler2D sampler;
 
     in vec2 v_uv;
@@ -98,7 +99,10 @@ fn build_shader(gl: &Gl, source: &str, shader_type: GLenum) -> GLuint {
     gl.shader_source(shader, &[source.as_str().as_bytes()]);
     gl.compile_shader(shader);
     let status = gl.get_shader_iv(shader, gl::COMPILE_STATUS);
-    assert_ne!(status, 0);
+    if status == 0 {
+        let error = gl.get_shader_info_log(shader);
+        panic!("Shader compilation failed. Error {:?} in shader {:?}", error, source);
+    }
 
     shader
 }

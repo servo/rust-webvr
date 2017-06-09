@@ -7,7 +7,7 @@ use gl_generator::{Registry, Api, Profile, Fallbacks};
 
 fn main() {
 
-    if !cfg!(feature = "googlevr") {
+    if !cfg!(feature = "googlevr") && !cfg!(feature = "oculusvr")  {
         return;
     }
 

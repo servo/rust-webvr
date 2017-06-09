@@ -72,7 +72,7 @@ impl VRService for OculusVRService {
     }
 
     fn is_available(&self) -> bool {
-        true   
+        true
     }
 
     fn poll_events(&self) -> Vec<VREvent> {

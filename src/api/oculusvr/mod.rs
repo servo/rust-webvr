@@ -22,10 +22,3 @@ impl VRServiceCreator for OculusVRServiceCreator {
      }
 }
 
-// Export functions called from Java
-#[cfg(target_os="android")]
-pub mod jni {
-    pub use super::service::Java_com_rust_webvr_OVRService_nativeOnPause;
-    pub use super::service::Java_com_rust_webvr_OVRService_nativeOnResume;
-}
-

@@ -381,7 +381,7 @@ pub fn main() {
     let mut vr = VRServiceManager::new();
     // Register default VRService implementations and initialize them.
     // Default VRServices are specified using cargo features.
-     vr.register_defaults();
+    vr.register_defaults();
     // Add a mock service to allow running the demo when no VRDisplay is available.
     // If no VR service is found the demo fallbacks to the Mock.
     vr.register_mock();
@@ -576,7 +576,15 @@ pub fn main() {
 
         // We don't need to swap buffer on Android because Daydream view is on top of the window.
         if !cfg!(target_os = "android") {
-            window.swap_buffers().unwrap();
+            match window.swap_buffers() {
+                Err(error) => {
+                    match error {
+                        glutin::ContextError::ContextLost => {},
+                        _ => { panic!("swap_buffers error: {:?}", error); },
+                    }
+                },
+                Ok(_) => {},
+            }
         }
 
         // We don't need to poll VR headset events every frame

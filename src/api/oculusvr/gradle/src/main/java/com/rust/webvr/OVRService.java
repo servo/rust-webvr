@@ -46,7 +46,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks {
         if (activity != mActivity) {
             return;
         }
-        nativeOnResume(mPtr);
+        //nativeOnResume(mPtr);
     }
 
     @Override
@@ -54,7 +54,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks {
         if (activity != mActivity) {
             return;
         }
-        nativeOnPause(mPtr);
+        //nativeOnPause(mPtr);
     }
 
     @Override

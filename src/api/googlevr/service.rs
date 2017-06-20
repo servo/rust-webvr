@@ -125,7 +125,7 @@ impl GoogleVRService {
     unsafe fn create_context(&mut self) -> Result<(), String> {
         let jni_scope = try!(JNIScope::attach());
 
-        let jni = jni_scope.jni;
+        let jni = jni_scope.jni();
         let env = jni_scope.env;
 
         // Use NativeActivity's classloader to find our class

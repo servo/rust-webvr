@@ -1,7 +1,7 @@
 #![cfg(target_os="android")]
 #![cfg(feature = "oculusvr")]
 
-use {VRGamepad, VRGamepadData, VRGamepadHand, VRGamepadState, VRGamepadButton};
+use {VRGamepad, VRGamepadData, VRGamepadHand, VRGamepadState};
 use super::super::utils;
 use std::cell::RefCell;
 use std::sync::Arc;

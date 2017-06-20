@@ -3,7 +3,6 @@
 
 use {VRService, VRDisplay, VRDisplayPtr, VREvent, VRGamepadPtr};
 use android_injected_glue as android;
-use android_injected_glue::ffi as ndk;
 use ovr_mobile_sys as ovr;
 use std::mem;
 use std::ptr;
@@ -11,15 +10,12 @@ use super::display::{OculusVRDisplay, OculusVRDisplayPtr};
 use super::gamepad::{OculusVRGamepad, OculusVRGamepadPtr};
 use super::jni_utils::JNIScope;
 
-const SERVICE_CLASS_NAME:&'static str = "com/rust/webvr/OVRService";
-
 pub struct OculusVRService {
     initialized: bool,
-    ovr_java: ovr::ovrJava,
+    ovr_java: OVRJava,
     displays: Vec<OculusVRDisplayPtr>,
     gamepads: Vec<OculusVRGamepadPtr>,
-    java_object: ndk::jobject,
-    java_class: ndk::jclass,
+    android_event_handler: *const AndroidEventHandler, 
 }
 
 unsafe impl Send for OculusVRService {}
@@ -35,6 +31,11 @@ impl VRService for OculusVRService {
             //self.create_controller_context();
         }
 
+        // Register Android Event Handler
+        let handler = Box::new(AndroidEventHandler::new(self));
+        self.android_event_handler = handler.as_ref() as *const _;
+        android::add_sync_event_handler(handler);
+
         Ok(())
     }
 
@@ -46,7 +47,7 @@ impl VRService for OculusVRService {
 
         // Ensure that there are not initialization errors
         try!(self.initialize());
-        let display = OculusVRDisplay::new(&self.ovr_java as *const _);
+        let display = OculusVRDisplay::new(self.ovr_java.handle());
         self.displays.push(display);
 
         Ok(self.clone_displays())
@@ -76,7 +77,11 @@ impl VRService for OculusVRService {
     }
 
     fn poll_events(&self) -> Vec<VREvent> {
-        Vec::new()
+        let mut events = Vec::new();
+        for display in &self.displays {
+            display.borrow_mut().poll_events(&mut events);
+        }
+        events
     }
 }
 
@@ -84,11 +89,10 @@ impl OculusVRService {
     pub fn new() -> OculusVRService {
         OculusVRService {
             initialized: false,
-            ovr_java: unsafe { mem::zeroed() },
+            ovr_java: OVRJava::empty(),
             displays: Vec::new(),
             gamepads: Vec::new(),
-            java_object: ptr::null_mut(),
-            java_class: ptr::null_mut(),
+            android_event_handler: ptr::null(),
         }
     }
 
@@ -97,33 +101,8 @@ impl OculusVRService {
     }
 
     unsafe fn api_init(&mut self) -> Result<(), String> {
-        let jni_scope = try!(JNIScope::attach());
-
-        let jni = jni_scope.jni;
-        let env = jni_scope.env;
-
-        // Use NativeActivity's classloader to find our class
-        self.java_class = try!(jni_scope.find_class(SERVICE_CLASS_NAME));
-        if self.java_class.is_null() {
-            return Err("Didn't find GVRService class".into());
-        };
-        self.java_class = (jni.NewGlobalRef)(env, self.java_class);
-
-        // Create OVRService instance and own it as a globalRef.
-        let method = jni_scope.get_method(self.java_class, "create", "(Landroid/app/Activity;J)Ljava/lang/Object;", true);
-        let thiz: usize = mem::transmute(self as * mut OculusVRService);
-        self.java_object = (jni.CallStaticObjectMethod)(env, self.java_class, method, jni_scope.activity, thiz as ndk::jlong);
-        if self.java_object.is_null() {
-            return Err("Failed to create OVRService instance".into());
-        };
-        self.java_object = (jni.NewGlobalRef)(env, self.java_object);
-
-        // Initialize native VrApi
-        self.ovr_java.Vm = mem::transmute(&mut (*jni_scope.vm).functions);
-        self.ovr_java.Env = mem::transmute(&mut (*env).functions);
-        self.ovr_java.ActivityObject = (jni.NewGlobalRef)(env, jni_scope.activity) as *mut _;
-
-        let init_params = ovr::helpers::vrapi_DefaultInitParms(&self.ovr_java);
+        try!(self.ovr_java.attach());
+        let init_params = ovr::helpers::vrapi_DefaultInitParms(self.ovr_java.handle());
         let status = ovr::vrapi_Initialize(&init_params);
 
         if status == ovr::ovrInitializeStatus::VRAPI_INITIALIZE_SUCCESS {
@@ -178,6 +157,10 @@ impl OculusVRService {
 impl Drop for OculusVRService {
     fn drop(&mut self) {
         if self.is_initialized() {
+            // Unregister Android Event Handler
+            android::remove_sync_event_handler(self.android_event_handler);
+
+            // Shutdown API
             unsafe {
                 ovr::vrapi_Shutdown();
             }
@@ -186,24 +169,127 @@ impl Drop for OculusVRService {
 }
 
 
-#[cfg(target_os="android")]
-#[no_mangle]
-#[allow(non_snake_case)]
-#[allow(dead_code)]
-pub extern fn Java_com_rust_webvr_OVRService_nativeOnPause(_: *mut ndk::JNIEnv, service: ndk::jlong) {
-    unsafe {
-        let service: *mut OculusVRService = mem::transmute(service as usize);
-        (*service).on_pause();
+struct AndroidEventHandler {
+    service: *mut OculusVRService,
+    resume_received: bool,
+    pause_received: bool,
+    surface_create_received: bool,
+    surface_destroy_received: bool,
+}
+
+impl AndroidEventHandler {
+    pub fn new(service: *mut OculusVRService) -> Self {
+        Self {
+            service: service,
+            resume_received: false,
+            pause_received: false,
+            surface_create_received: false,
+            surface_destroy_received: false,
+        }
+    }
+
+    fn clear_flags(&mut self) {
+        self.resume_received = false;
+        self.pause_received = false;
+        self.surface_create_received = false;
+        self.surface_destroy_received = false;
+    }
+
+    // An Android Activity is only in the resumed state with a valid Android Surface between
+    // surfaceChanged() or onResume(), whichever comes last, and surfaceDestroyed() or onPause(),
+    // whichever comes first. In other words, a VR application will typically enter VR mode
+    // from surfaceChanged() or onResume(), whichever comes last, and leave VR mode from
+    // surfaceDestroyed() or onPause(), whichever comes first.
+    fn handle_life_cycle(&mut self) {
+        if self.surface_create_received && self.resume_received {
+            unsafe {
+                (*self.service).on_resume();
+            }
+            self.clear_flags();
+        } else if self.pause_received || self.surface_destroy_received {
+            unsafe {
+                (*self.service).on_pause();
+            }
+            self.clear_flags();
+        }
     }
 }
 
-#[cfg(target_os="android")]
-#[no_mangle]
-#[allow(non_snake_case)]
-#[allow(dead_code)]
-pub extern fn Java_com_rust_webvr_OVRService_nativeOnResume(_: *mut ndk::JNIEnv, service: ndk::jlong) {
-    unsafe {
-        let service: *mut OculusVRService = mem::transmute(service as usize);
-        (*service).on_resume();
+impl android::SyncEventHandler for AndroidEventHandler {
+    fn handle(&mut self, event: &android::Event) {
+        match *event {
+            android::Event::InitWindow => {
+                self.surface_create_received = true;
+                self.handle_life_cycle();
+            },
+            android::Event::TermWindow => {
+                self.surface_destroy_received = true;
+                self.handle_life_cycle();
+            },
+            android::Event::Pause => {
+                self.pause_received = true;
+                self.handle_life_cycle();
+            },
+            android::Event::Resume => {
+                self.resume_received = true;
+                self.handle_life_cycle();
+            },
+            _ => {}
+        }
+    }
+}
+
+pub struct OVRJava {
+    java: ovr::ovrJava,
+    jni_scope: Option<JNIScope>,
+}
+
+impl OVRJava {
+    pub fn empty() -> OVRJava {
+        OVRJava {
+            java: unsafe { mem::zeroed() },
+            jni_scope: None,
+        }
+    }
+
+    pub fn attach(&mut self) -> Result<(), String> {
+        self.detach();
+        unsafe {
+            let jni_scope = try!(JNIScope::attach());
+            {
+                let jni = jni_scope.jni();
+                let env = jni_scope.env;
+
+                // Initialize native VrApi
+                self.java.Vm = mem::transmute(&mut (*jni_scope.vm).functions);
+                self.java.Env = mem::transmute(&mut (*env).functions);
+                self.java.ActivityObject = (jni.NewGlobalRef)(env, jni_scope.activity) as *mut _;
+            }
+            self.jni_scope = Some(jni_scope);
+
+            Ok(())
+        }
+    }
+
+    pub fn detach(&mut self) {
+        if !self.java.ActivityObject.is_null() {
+            let jni_scope = self.jni_scope.as_ref().unwrap();
+            let jni = jni_scope.jni();
+            let env = jni_scope.env;
+            (jni.DeleteGlobalRef)(env, self.java.ActivityObject as *mut _);
+            self.java.ActivityObject = ptr::null_mut();
+        }
+
+        self.jni_scope = None;
+    }
+
+    pub fn handle(&self) -> *const ovr::ovrJava {
+        &self.java as *const _
+    }
+}
+
+impl<'a> Drop for OVRJava {
+    fn drop(&mut self) {
+        self.detach();
     }
 }

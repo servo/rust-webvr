@@ -27,5 +27,3 @@ pub use self::googlevr::jni::*;
 mod oculusvr;
 #[cfg(all(feature = "oculusvr", target_os= "android"))]
 pub use self::oculusvr::OculusVRServiceCreator;
-#[cfg(all(feature = "oculusvr", target_os= "android"))]
-pub use self::oculusvr::jni::*;

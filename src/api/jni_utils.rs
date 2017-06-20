@@ -7,15 +7,14 @@ use std::ffi::CString;
 use std::ptr;
 use std::mem;
 
-pub struct JNIScope<'a> {
-    pub vm: &'a mut ndk::_JavaVM,
+pub struct JNIScope {
+    pub vm: *mut ndk::_JavaVM,
     pub env: *mut ndk::JNIEnv,
-    pub jni: &'a ndk::JNINativeInterface,
-    pub activity: ndk::jobject
+    pub activity: ndk::jobject,
 }
 
-impl<'a> JNIScope<'a> {
-    pub unsafe fn attach() -> Result<JNIScope<'a>, String> {
+impl JNIScope {
+    pub unsafe fn attach() -> Result<JNIScope, String> {
         let mut env: *mut ndk::JNIEnv = mem::uninitialized();
         let activity: &ndk::ANativeActivity = mem::transmute(android::get_app().activity);
         let vm: &mut ndk::_JavaVM = mem::transmute(activity.vm);
@@ -26,12 +25,9 @@ impl<'a> JNIScope<'a> {
             return Err("JNI AttachCurrentThread failed".into());
         }
 
-        let jni: &ndk::JNINativeInterface = mem::transmute((*env).functions);
-
         Ok(JNIScope {
             vm: vm,
             env: env,
-            jni: jni,
             activity: activity.clazz
         })
     }
@@ -40,7 +36,7 @@ impl<'a> JNIScope<'a> {
         // jni.FindClass doesn't find our classes because the attached thread has not our classloader.
         // NativeActivity's classloader is used to fix this issue.
         let env = self.env;
-        let jni = self.jni;
+        let jni = self.jni();
 
         let activity_class = (jni.GetObjectClass)(env, self.activity);
         if activity_class.is_null() {
@@ -70,20 +66,27 @@ impl<'a> JNIScope<'a> {
                              is_static: bool) -> ndk::jmethodID {
         let method = CString::new(method).unwrap();
         let signature = CString::new(signature).unwrap();
+        let jni = self.jni();
 
         if is_static {
-            (self.jni.GetStaticMethodID)(self.env, class, method.as_ptr(), signature.as_ptr())
+            (jni.GetStaticMethodID)(self.env, class, method.as_ptr(), signature.as_ptr())
         } else {
-            (self.jni.GetMethodID)(self.env, class, method.as_ptr(), signature.as_ptr())
+            (jni.GetMethodID)(self.env, class, method.as_ptr(), signature.as_ptr())
         }
-    } 
+    }
+
+    pub fn jni(&self) -> &mut ndk::JNINativeInterface {
+        unsafe {
+            mem::transmute((*self.env).functions)
+        }
+    }
 }
 
-impl<'a> Drop for JNIScope<'a> {
+impl Drop for JNIScope {
     // Autodetach JNI thread
     fn drop(&mut self) {
         unsafe {
-            let vmf: &ndk::JNIInvokeInterface = mem::transmute(self.vm.functions);
+            let vmf: &ndk::JNIInvokeInterface = mem::transmute((*self.vm).functions);
             (vmf.DetachCurrentThread)(self.vm);
         }
     }

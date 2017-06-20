@@ -3,17 +3,16 @@
 
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
     VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer};
-use android_injected_glue;
 use gl;
 use ovr_mobile_sys as ovr;
 use ovr_mobile_sys::ovrFrameLayerEye::*;
 use ovr_mobile_sys::ovrSystemProperty::*;
-use std::sync::Arc;
 use std::cell::{Cell, RefCell};
 use std::mem;
 use std::ptr;
-use super::service::OculusVRService;
+use std::sync::{Arc, Condvar, Mutex};
 use super::super::utils;
+use super::service::OVRJava;
 
 pub type OculusVRDisplayPtr = Arc<RefCell<OculusVRDisplay>>;
 
@@ -25,15 +24,24 @@ extern {
 pub struct OculusVRDisplay {
     display_id: u32,
     ovr: *mut ovr::ovrMobile,
-    ovr_java: *const ovr::ovrJava,
+    // Used in the data query thread. Shared with OVRService.
+    data_ovr_java: *const ovr::ovrJava,
+    // Used in the render thread
+    render_ovr_java: OVRJava,
     eye_framebuffers: Vec<OculusEyeFramebuffer>,
     read_fbo: u32,
     read_texture: u32,
-    resumed: bool,
     frame_index: i64,
     predicted_display_time: f64,
     predicted_tracking: ovr::ovrTracking,
     eye_projection: Cell<ovr::ovrMatrix4f>,
+    presenting: bool,
+    activity_paused: bool,
+    new_events_hint: bool,
+    pending_events: Mutex<Vec<VREvent>>,
+    processed_events: Mutex<Vec<VREvent>>,
+    // waiting for an event to occur. 
+    leave_vr_condition: (Mutex<bool>, Condvar),
 }
 
 unsafe impl Send for OculusVRDisplay {}
@@ -63,25 +71,32 @@ impl VRDisplay for OculusVRDisplay {
     fn inmediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
 
-        if self.is_in_vr_mode() {
+        if !self.activity_paused && self.is_in_vr_mode() {
             let tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, 0.0) };
-            self.fetch_frame_data(&tracking, &mut data, near as f32, far as f32);
+            self.fetch_frame_data(self.data_ovr_java, &tracking,
+                                  &mut data,
+                                  near as f32,
+                                  far as f32);
         }
-        
+
         data
     }
 
     fn synced_frame_data(&self, near: f64, far: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
-        if self.is_in_vr_mode() {
-            self.fetch_frame_data(&self.predicted_tracking, &mut data, near as f32, far as f32);
+        if !self.activity_paused && self.is_in_vr_mode() {
+            self.fetch_frame_data(self.render_ovr_java.handle(),
+                                  &self.predicted_tracking,
+                                  &mut data,
+                                  near as f32,
+                                  far as f32);
         }
 
         data
     }
 
     fn reset_pose(&mut self) {
-        if self.is_in_vr_mode() {
+        if !self.activity_paused && self.is_in_vr_mode() {
             unsafe {
                 ovr::vrapi_RecenterPose(self.ovr);
             }
@@ -89,9 +104,14 @@ impl VRDisplay for OculusVRDisplay {
     }
 
     fn sync_poses(&mut self) {
+        if self.activity_paused {
+            return;
+        }
+
         if !self.is_in_vr_mode() {
             self.start_present();
         }
+
         if self.eye_framebuffers.is_empty() {
             self.create_swap_chains();
             debug_assert!(!self.eye_framebuffers.is_empty());
@@ -102,7 +122,11 @@ impl VRDisplay for OculusVRDisplay {
     }
 
     fn submit_frame(&mut self, layer: &VRLayer) {
-        let mut frame_params = ovr::helpers::vrapi_DefaultFrameParms(self.ovr_java,
+        if self.activity_paused || !self.is_in_vr_mode() {
+            return;
+        }
+
+        let mut frame_params = ovr::helpers::vrapi_DefaultFrameParms(self.render_ovr_java.handle(),
                                                                      ovr::ovrFrameInit::VRAPI_FRAME_INIT_DEFAULT,
                                                                      self.predicted_display_time,
                                                                      ptr::null_mut());
@@ -116,8 +140,7 @@ impl VRDisplay for OculusVRDisplay {
 
         let eye_projection = self.eye_projection.get();
         for (i, eye) in self.eye_framebuffers.iter_mut().enumerate() {
-            let swap_chain_length = unsafe { ovr::vrapi_GetTextureSwapChainLength(eye.swap_chain) };
-            let swap_chain_index = (self.frame_index % swap_chain_length as i64) as i32;
+            let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
 
             if self.read_texture != layer.texture_id {
                 // Attach external texture to the used later in BlitFramebuffer.
@@ -163,31 +186,13 @@ impl VRDisplay for OculusVRDisplay {
     }
 
     fn start_present(&mut self) {
-        if !self.ovr.is_null() {
-            return;
-        }
-        
-        let mut mode = ovr::helpers::vrapi_DefaultModeParms(self.ovr_java);
-        mode.Flags |= ovr::ovrModeFlags::VRAPI_MODE_FLAG_NATIVE_WINDOW as u32;
-        //mode.WindowSurface = unsafe { android_injected_glue::get_native_window() as u64 };
-        //mode.Display = unsafe { eglGetCurrentDisplay() as u64 };
-        //mode.ShareContext = unsafe { eglGetCurrentContext() as u64 };
-
-        self.ovr = unsafe { ovr::vrapi_EnterVrMode(&mode) };
-
-        if self.ovr.is_null() {
-            error!("Entering VR mode failed because the ANativeWindow was not valid.");
-        }
+        self.presenting = true;
+        self.enter_vr_mode();
     }
 
     fn stop_present(&mut self) {
-        if !self.ovr.is_null() {
-            return;
-        }
-        unsafe {
-            ovr::vrapi_LeaveVrMode(self.ovr);
-        }
-        self.ovr = ptr::null_mut();
+        self.presenting = false;
+        self.exit_vr_mode();
     }
 }
 
@@ -196,34 +201,79 @@ impl OculusVRDisplay {
         Arc::new(RefCell::new(OculusVRDisplay {
             display_id: utils::new_id(),
             ovr: ptr::null_mut(),
-            ovr_java: ovr_java,
+            data_ovr_java: ovr_java,
+            render_ovr_java: OVRJava::empty(),
             eye_framebuffers: Vec::new(),
             read_fbo: 0,
             read_texture: 0,
-            resumed: true,
             frame_index: 0,
             predicted_display_time: 0.0,
             predicted_tracking: unsafe { mem::zeroed() },
             eye_projection: Cell::new(ovr::helpers::ovrMatrix4f_CreateIdentity()),
+            presenting: false,
+            activity_paused: false,
+            new_events_hint: false,
+            pending_events: Mutex::new(Vec::new()),
+            processed_events: Mutex::new(Vec::new()),
+            leave_vr_condition: (Mutex::new(false), Condvar::new()),
         }))
     }
 
-    pub fn pause(&mut self) {
-        self.resumed = false;
-    }
-
-    pub fn resume(&mut self) {
-        self.resumed = true;
-    }
-
     fn is_in_vr_mode(&self) -> bool {
-        self.resumed && !self.ovr.is_null()
+        !self.ovr.is_null()
+    }
+
+    fn enter_vr_mode(&mut self) {
+        if self.is_in_vr_mode() {
+            return;
+        }
+
+        if let Err(error) = self.render_ovr_java.attach() {
+            panic!("Failed to attach to JavaThread {}", error);
+        }
+
+        let display = unsafe { eglGetCurrentDisplay() };
+        if display.is_null() {
+            return;
+        }
+
+        for _ in 0..10 {
+            println!("ENTER VR MODE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+        }
+        
+        let mut mode = ovr::helpers::vrapi_DefaultModeParms(self.render_ovr_java.handle());
+        mode.Flags |= ovr::ovrModeFlags::VRAPI_MODE_FLAG_NATIVE_WINDOW as u32;
+        //mode.WindowSurface = unsafe { android_injected_glue::get_native_window() as u64 };
+        //mode.Display = unsafe { eglGetCurrentDisplay() as u64 };
+        //mode.ShareContext = unsafe { eglGetCurrentContext() as u64 };
+
+        println!("Enter {:?}", mode);
+
+        self.ovr = unsafe { ovr::vrapi_EnterVrMode(&mode) };
+
+        if self.ovr.is_null() {
+            panic!("Entering VR mode failed because the ANativeWindow was not valid.");
+        }
+    }
+
+    fn exit_vr_mode(&mut self) {
+        if self.is_in_vr_mode() {
+            for _ in 0..10 {
+                println!("EXIT VR MODE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
+            }
+            let ovr = self.ovr;
+            self.ovr = ptr::null_mut();
+            unsafe {
+                ovr::vrapi_LeaveVrMode(ovr);
+            }
+            self.render_ovr_java.detach();
+        }
     }
 
     fn create_swap_chains(&mut self) {
         self.eye_framebuffers.clear();
 
-        let recommended_eye_size = self.recommended_render_size();
+        let recommended_eye_size = Self::recommended_render_size(self.render_ovr_java.handle());
 
         if self.read_fbo == 0 {
             let mut fbo = 0;
@@ -264,10 +314,10 @@ impl OculusVRDisplay {
 
     fn fetch_eye_parameters(&self, left_eye: &mut VREyeParameters, right_eye: &mut VREyeParameters) {
         let fov_x = unsafe {
-            ovr::vrapi_GetSystemPropertyFloat(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X)
+            ovr::vrapi_GetSystemPropertyFloat(self.data_ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X)
         };
         let fov_y = unsafe {
-            ovr::vrapi_GetSystemPropertyFloat(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_Y)
+            ovr::vrapi_GetSystemPropertyFloat(self.data_ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_Y)
         };
 
         left_eye.field_of_view.left_degrees = fov_x as f64;
@@ -280,7 +330,7 @@ impl OculusVRDisplay {
         right_eye.field_of_view.up_degrees = fov_y as f64;
         right_eye.field_of_view.down_degrees = fov_y as f64;
 
-        let render_size = self.recommended_render_size();
+        let render_size = Self::recommended_render_size(self.data_ovr_java);
         
         left_eye.render_width = render_size.0;
         left_eye.render_height = render_size.1;
@@ -288,27 +338,28 @@ impl OculusVRDisplay {
         right_eye.render_height = render_size.1;
     }
 
-    fn recommended_render_size(&self) -> (u32, u32) {
+    fn recommended_render_size(java: *const ovr::ovrJava) -> (u32, u32) {
         let w = unsafe {
-            ovr::vrapi_GetSystemPropertyInt(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_TEXTURE_WIDTH)
+            ovr::vrapi_GetSystemPropertyInt(java, VRAPI_SYS_PROP_SUGGESTED_EYE_TEXTURE_WIDTH)
         };
         let h = unsafe {
-            ovr::vrapi_GetSystemPropertyInt(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_TEXTURE_HEIGHT)
+            ovr::vrapi_GetSystemPropertyInt(java, VRAPI_SYS_PROP_SUGGESTED_EYE_TEXTURE_HEIGHT)
         };
 
         (w as u32, h as u32)
     }
 
     fn fetch_frame_data(&self,
+                        java: *const ovr::ovrJava, 
                         tracking: &ovr::ovrTracking,
                         out: &mut VRFrameData,
                         near: f32,
                         far: f32) {
         let fov_x = unsafe {
-            ovr::vrapi_GetSystemPropertyFloat(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X)
+            ovr::vrapi_GetSystemPropertyFloat(java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_X)
         };
         let fov_y = unsafe {
-            ovr::vrapi_GetSystemPropertyFloat(self.ovr_java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_Y)
+            ovr::vrapi_GetSystemPropertyFloat(java, VRAPI_SYS_PROP_SUGGESTED_EYE_FOV_DEGREES_Y)
         };
 
         // Projection Matrix
@@ -343,6 +394,95 @@ impl OculusVRDisplay {
 
         // Timestamp
         out.timestamp = tracking.HeadPose.TimeInSeconds * 1000.0;
+    }
+
+    // Warning: this function is called from java Main thread
+    // Use mutexes to ensure thread safety and process the event in sync with the render loop.
+    #[allow(dead_code)]
+    pub fn pause(&mut self) {
+        let mut left = self.leave_vr_condition.0.lock().unwrap();
+        *left = false;
+        let wait_until_vr_mode_left = self.presenting;
+
+        {
+            let mut pending = self.pending_events.lock().unwrap();
+            pending.push(VRDisplayEvent::Pause(self.display_id).into());
+
+            self.new_events_hint = true;
+        }
+
+        if wait_until_vr_mode_left {
+            // Wait
+            while !*left {
+                left = self.leave_vr_condition.1.wait(left).unwrap();
+            }
+        }
+    }
+
+    // Warning: this function is called from java Main thread
+    // Use mutexes to ensure thread safety and process the event in sync with the render loop.
+    #[allow(dead_code)]
+    pub fn resume(&mut self) {
+        let mut pending = self.pending_events.lock().unwrap();
+        pending.push(VRDisplayEvent::Resume(self.display_id).into());
+
+        self.new_events_hint = true;
+    }
+
+    fn handle_events(&mut self) {
+        if !self.new_events_hint {
+            // Optimization to avoid mutex locks every frame
+            // It doesn't matter if events are processed in the next loop iteration
+            return;
+        }
+        
+        let mut pending: Vec<VREvent> = {
+            let mut pending_events = self.pending_events.lock().unwrap();
+            self.new_events_hint = false;
+            let res = (*pending_events).drain(..).collect();
+            res
+        };
+        
+
+        for event in &pending {
+            match *event {
+                VREvent::Display(ref ev) => {
+                    self.handle_display_event(&ev);
+                },
+                _ => {}
+            }
+        }
+
+        let mut processed = self.processed_events.lock().unwrap();
+        processed.extend(pending.drain(..));
+    }
+
+    fn handle_display_event(&mut self, event: &VRDisplayEvent) {
+        match *event {
+            VRDisplayEvent::Pause(_) => {
+                self.activity_paused = true;
+                if self.presenting {
+                    self.exit_vr_mode();
+                    // Notify
+                    let mut left = self.leave_vr_condition.0.lock().unwrap();
+                    *left = true;
+                    self.leave_vr_condition.1.notify_one();
+                }
+            },
+            VRDisplayEvent::Resume(_) => {
+                self.activity_paused = false;
+                if self.presenting {
+                    self.enter_vr_mode();
+                }
+            }
+            _ => {}
+        }
+    }
+
+    pub fn poll_events(&mut self, out: &mut Vec<VREvent>) {
+        self.handle_events();
+        let mut processed = self.processed_events.lock().unwrap();
+        out.extend(processed.drain(..));
     }
 }
 

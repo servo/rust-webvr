@@ -5,15 +5,18 @@ authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-glutin = "0.7.4"
+glutin = {git = "https://github.com/MortimerGoro/glutin", branch = "android_fixes"}
 gleam = "0.4"
 cgmath = "0.12"
 image = "0.12"
 android_glue = "0.2"
 
 [target.'cfg(target_os = "android")'.dependencies]
-android_injected_glue = {git = "https://github.com/mmatyas/android-rs-injected-glue"}
+android_injected_glue = "0.2.2"
 
 [dependencies.rust-webvr]
 path = "../.."
+features = ["oculusvr"]
 
+[replace]
+"android_injected_glue:0.2.2" = { path = "/home/mortimer/Projects/android-rs-injected-glue" }

@@ -22,7 +22,7 @@ build = "build.rs"
 package-name = "rust.webvr"
 
 [features]
-default = ["openvr", "mock"]
+default = ["openvr", "mock", "oculusvr"]
 openvr = ["libloading"]
 mock = []
 googlevr = ["gvr-sys"]

@@ -12,7 +12,7 @@ use std::mem;
 use std::ptr;
 use std::sync::{Arc, Condvar, Mutex};
 use super::super::utils;
-use super::service::OVRJava;
+use super::service::{OVRJava, OVRServiceJava};
 
 pub type OculusVRDisplayPtr = Arc<RefCell<OculusVRDisplay>>;
 
@@ -24,6 +24,7 @@ extern {
 pub struct OculusVRDisplay {
     display_id: u32,
     ovr: *mut ovr::ovrMobile,
+    service_java: OVRServiceJava,
     // Used in the data query thread. Shared with OVRService.
     data_ovr_java: *const ovr::ovrJava,
     // Used in the render thread
@@ -197,12 +198,15 @@ impl VRDisplay for OculusVRDisplay {
 }
 
 impl OculusVRDisplay {
-    pub fn new(ovr_java: *const ovr::ovrJava) -> Arc<RefCell<OculusVRDisplay>> {
+    pub fn new(service_java: OVRServiceJava,
+               ovr_java: *const ovr::ovrJava)
+               -> Arc<RefCell<OculusVRDisplay>> {
         Arc::new(RefCell::new(OculusVRDisplay {
             display_id: utils::new_id(),
             ovr: ptr::null_mut(),
+            service_java: service_java,
             data_ovr_java: ovr_java,
-            render_ovr_java: OVRJava::empty(),
+            render_ovr_java: OVRJava::default(),
             eye_framebuffers: Vec::new(),
             read_fbo: 0,
             read_texture: 0,

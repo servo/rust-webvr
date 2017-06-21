@@ -11,8 +11,9 @@ use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::mem;
 use std::path::Path;
+use std::{thread, time};
 
-use webvr::{VRServiceManager, VRLayer, VRFrameData};
+use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData};
 
 type Vec3 = Vector3<f32>;
 type Mat4 = Matrix4<f32>;
@@ -590,30 +591,34 @@ pub fn main() {
         // We don't need to poll VR headset events every frame
         event_counter += 1;
         if event_counter % 100 == 0 {
-            for event in vr.poll_events() {
-                println!("VR Event: {:?}", event);
+            let mut paused = false;
+            loop {
+                for event in vr.poll_events() {
+                    println!("VR Event: {:?}", event);
+                    match event {
+                        VREvent::Display(ev) => {
+                            match ev {
+                                VRDisplayEvent::Resume(..) => { paused = false;},
+                                VRDisplayEvent::Pause(..) => { paused = true; },
+                                _ => {},
+                            }
+                        },
+                        _ => {}
+                    }
+                }
+                if !paused {
+                    break;
+                }
+                // Wait until Resume Event is received
+                thread::sleep(time::Duration::from_millis(5));
             }
         }
 
-        let mut suspended = false;
-        loop {
-            for event in window.poll_events() {
-                match event {
-                    glutin::Event::Closed => return,
-                    glutin::Event::Suspended(value) => {
-                        println!("Application suspended {:?}", value);
-                        suspended = value; 
-                    },
-                    _ => {}
-                }
-            }
-            if !suspended {
-                break;
-            }
-
-            // Poll events when suspended
-            for event in vr.poll_events() {
-                println!("VR Event: {:?}", event);
+        // Window Events
+        for event in window.poll_events() {
+            match event {
+                glutin::Event::Closed => return,
+                _ => {}
             }
         }
     }

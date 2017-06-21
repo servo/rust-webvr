@@ -80,6 +80,12 @@ impl JNIScope {
             mem::transmute((*self.env).functions)
         }
     }
+
+    pub fn jni_from_env(env: *mut ndk::JNIEnv) -> *mut ndk::JNINativeInterface {
+        unsafe {
+            (*env).functions as *mut _
+        }
+    }
 }
 
 impl Drop for JNIScope {

@@ -26,7 +26,6 @@ impl VRServiceCreator for OculusVRServiceCreator {
 pub mod jni {
     pub use super::service::Java_com_rust_webvr_OVRService_nativeOnPause;
     pub use super::service::Java_com_rust_webvr_OVRService_nativeOnResume;
-    pub use super::service::Java_com_rust_webvr_OVRService_nativeOnSurfaceCreated;
     pub use super::service::Java_com_rust_webvr_OVRService_nativeOnSurfaceChanged;
     pub use super::service::Java_com_rust_webvr_OVRService_nativeOnSurfaceDestroyed;
 }

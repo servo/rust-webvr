@@ -3,6 +3,7 @@
 
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
     VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer};
+use android_injected_glue::ffi as ndk;
 use gl;
 use ovr_mobile_sys as ovr;
 use ovr_mobile_sys::ovrFrameLayerEye::*;
@@ -11,14 +12,22 @@ use std::cell::{Cell, RefCell};
 use std::mem;
 use std::ptr;
 use std::sync::{Arc, Condvar, Mutex};
-use super::super::utils;
+use super::jni_utils::JNIScope;
 use super::service::{OVRJava, OVRServiceJava};
+use super::super::utils;
 
 pub type OculusVRDisplayPtr = Arc<RefCell<OculusVRDisplay>>;
 
 extern {
     fn eglGetCurrentContext() -> *mut ::std::os::raw::c_void;
     fn eglGetCurrentDisplay() -> *mut ::std::os::raw::c_void;
+    fn ANativeWindow_fromSurface(env: *mut ndk::JNIEnv, surface: ndk::jobject) -> *const ndk::ANativeWindow;
+}
+
+#[derive(Clone, Copy)]
+enum LifeCycleAction {
+    Resume,
+    Pause,
 }
 
 pub struct OculusVRDisplay {
@@ -39,8 +48,9 @@ pub struct OculusVRDisplay {
     presenting: bool,
     activity_paused: bool,
     new_events_hint: bool,
-    pending_events: Mutex<Vec<VREvent>>,
-    processed_events: Mutex<Vec<VREvent>>,
+    events: Mutex<Vec<VREvent>>,
+    new_pending_action_hint: bool,
+    pending_action: Mutex<Option<LifeCycleAction>>,
     // waiting for an event to occur. 
     leave_vr_condition: (Mutex<bool>, Condvar),
 }
@@ -105,6 +115,7 @@ impl VRDisplay for OculusVRDisplay {
     }
 
     fn sync_poses(&mut self) {
+        self.handle_pending_actions();
         if self.activity_paused {
             return;
         }
@@ -187,13 +198,38 @@ impl VRDisplay for OculusVRDisplay {
     }
 
     fn start_present(&mut self) {
+        if self.presenting == false {
+            // Show the SurfaceView on top of the Android view Hierarchy
+            unsafe {
+                if let Ok(jni_scope) = JNIScope::attach() {
+                    let jni = jni_scope.jni();
+                    let env = jni_scope.env;
+                    let method = jni_scope.get_method(self.service_java.class, "startPresent", "()V", false);
+                    (jni.CallVoidMethod)(env, self.service_java.instance, method);
+                }
+            }
+        }
+        if let Err(error) = self.render_ovr_java.attach() {
+            panic!("Failed to attach to JavaThread {}", error);
+        }
         self.presenting = true;
         self.enter_vr_mode();
     }
 
     fn stop_present(&mut self) {
-        self.presenting = false;
         self.exit_vr_mode();
+        if self.presenting == true {
+            // Hide the SurfaceView
+            unsafe {
+                if let Ok(jni_scope) = JNIScope::attach() {
+                    let jni = jni_scope.jni();
+                    let env = jni_scope.env;
+                    let method = jni_scope.get_method(self.service_java.class, "stopPresent", "()V", false);
+                    (jni.CallVoidMethod)(env, self.service_java.instance, method);
+                }
+            }
+        }
+        self.presenting = false;
     }
 }
 
@@ -217,8 +253,9 @@ impl OculusVRDisplay {
             presenting: false,
             activity_paused: false,
             new_events_hint: false,
-            pending_events: Mutex::new(Vec::new()),
-            processed_events: Mutex::new(Vec::new()),
+            events: Mutex::new(Vec::new()),
+            new_pending_action_hint: false,
+            pending_action: Mutex::new(None),
             leave_vr_condition: (Mutex::new(false), Condvar::new()),
         }))
     }
@@ -228,15 +265,14 @@ impl OculusVRDisplay {
     }
 
     fn enter_vr_mode(&mut self) {
-        if self.is_in_vr_mode() {
+        if self.is_in_vr_mode() || self.service_java.surface.is_null() {
             return;
         }
 
-        if let Err(error) = self.render_ovr_java.attach() {
-            panic!("Failed to attach to JavaThread {}", error);
-        }
-
         let display = unsafe { eglGetCurrentDisplay() };
+
+        // Return if display is not ready yet to avoid EGL_NO_DISPLAY error in vrapi_EnterVrMode.
+        // Sometines it takes a bit more time for the Display to be ready.
         if display.is_null() {
             return;
         }
@@ -244,17 +280,22 @@ impl OculusVRDisplay {
         for _ in 0..10 {
             println!("ENTER VR MODE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1")
         }
-        
+
         let mut mode = ovr::helpers::vrapi_DefaultModeParms(self.render_ovr_java.handle());
         mode.Flags |= ovr::ovrModeFlags::VRAPI_MODE_FLAG_NATIVE_WINDOW as u32;
-        //mode.WindowSurface = unsafe { android_injected_glue::get_native_window() as u64 };
-        //mode.Display = unsafe { eglGetCurrentDisplay() as u64 };
-        //mode.ShareContext = unsafe { eglGetCurrentContext() as u64 };
+
+        let env = self.render_ovr_java.jni_scope.as_ref().unwrap().env;
+        let surface = self.service_java.surface;
+
+        println!("nativeOnEnter: {:?}", surface);
+
+        mode.WindowSurface = unsafe { ANativeWindow_fromSurface(env, surface) as u64 };
+        mode.Display = unsafe { display as u64 };
+        mode.ShareContext = unsafe { eglGetCurrentContext() as u64 };
 
         println!("Enter {:?}", mode);
 
         self.ovr = unsafe { ovr::vrapi_EnterVrMode(&mode) };
-
         if self.ovr.is_null() {
             panic!("Entering VR mode failed because the ANativeWindow was not valid.");
         }
@@ -270,7 +311,7 @@ impl OculusVRDisplay {
             unsafe {
                 ovr::vrapi_LeaveVrMode(ovr);
             }
-            self.render_ovr_java.detach();
+            //self.render_ovr_java.detach();
         }
     }
 
@@ -402,17 +443,16 @@ impl OculusVRDisplay {
 
     // Warning: this function is called from java Main thread
     // Use mutexes to ensure thread safety and process the event in sync with the render loop.
-    #[allow(dead_code)]
     pub fn pause(&mut self) {
         let mut left = self.leave_vr_condition.0.lock().unwrap();
         *left = false;
         let wait_until_vr_mode_left = self.presenting;
 
         {
-            let mut pending = self.pending_events.lock().unwrap();
-            pending.push(VRDisplayEvent::Pause(self.display_id).into());
+            let mut pending_action = self.pending_action.lock().unwrap();
+            *pending_action = Some(LifeCycleAction::Pause);
 
-            self.new_events_hint = true;
+            self.new_pending_action_hint = true;
         }
 
         if wait_until_vr_mode_left {
@@ -421,72 +461,85 @@ impl OculusVRDisplay {
                 left = self.leave_vr_condition.1.wait(left).unwrap();
             }
         }
+
+        // Trigger Event
+        {
+            let mut events = self.events.lock().unwrap();
+            events.push(VRDisplayEvent::Pause(self.display_id).into());
+            self.new_events_hint = true;
+        }
     }
 
     // Warning: this function is called from java Main thread
     // Use mutexes to ensure thread safety and process the event in sync with the render loop.
-    #[allow(dead_code)]
     pub fn resume(&mut self) {
-        let mut pending = self.pending_events.lock().unwrap();
-        pending.push(VRDisplayEvent::Resume(self.display_id).into());
+        {
+            let mut pending_action = self.pending_action.lock().unwrap();
+            *pending_action = Some(LifeCycleAction::Resume);
 
+            self.new_pending_action_hint = true;
+        }
+        // Trigger Event
+        let mut events = self.events.lock().unwrap();
+        events.push(VRDisplayEvent::Resume(self.display_id).into());
         self.new_events_hint = true;
     }
 
-    fn handle_events(&mut self) {
-        if !self.new_events_hint {
+    // Warning: this function is called from java Main thread
+    pub fn update_surface(&mut self, surface: ndk::jobject) {
+        self.service_java.surface = surface;
+        println!("nativeOnUpdate: {:?}", surface);
+    }
+
+    fn handle_pending_actions(&mut self) {
+        if !self.new_pending_action_hint {
             // Optimization to avoid mutex locks every frame
             // It doesn't matter if events are processed in the next loop iteration
             return;
         }
-        
-        let mut pending: Vec<VREvent> = {
-            let mut pending_events = self.pending_events.lock().unwrap();
-            self.new_events_hint = false;
-            let res = (*pending_events).drain(..).collect();
-            res
+
+        let action;
+        {
+            let mut pending_action = self.pending_action.lock().unwrap();
+            action = *pending_action;
+            *pending_action = None;
+            self.new_pending_action_hint = false;
         };
-        
 
-        for event in &pending {
-            match *event {
-                VREvent::Display(ref ev) => {
-                    self.handle_display_event(&ev);
-                },
-                _ => {}
-            }
-        }
-
-        let mut processed = self.processed_events.lock().unwrap();
-        processed.extend(pending.drain(..));
-    }
-
-    fn handle_display_event(&mut self, event: &VRDisplayEvent) {
-        match *event {
-            VRDisplayEvent::Pause(_) => {
-                self.activity_paused = true;
-                if self.presenting {
-                    self.exit_vr_mode();
-                    // Notify
-                    let mut left = self.leave_vr_condition.0.lock().unwrap();
-                    *left = true;
-                    self.leave_vr_condition.1.notify_one();
-                }
-            },
-            VRDisplayEvent::Resume(_) => {
+        match action {
+            Some(LifeCycleAction::Resume) => {
                 self.activity_paused = false;
                 if self.presenting {
                     self.enter_vr_mode();
                 }
-            }
-            _ => {}
+            },
+            Some(LifeCycleAction::Pause) => {
+                self.activity_paused = true;
+                if self.presenting {
+                    self.exit_vr_mode();
+                    // Notify condition
+                    {
+                        let mut left = self.leave_vr_condition.0.lock().unwrap();
+                        *left = true;
+                        self.leave_vr_condition.1.notify_one();
+                    }
+                }
+            },
+            None => {}
         }
+
+        self.new_pending_action_hint = false;
     }
 
     pub fn poll_events(&mut self, out: &mut Vec<VREvent>) {
-        self.handle_events();
-        let mut processed = self.processed_events.lock().unwrap();
-        out.extend(processed.drain(..));
+        if !self.new_events_hint {
+            // Optimization to avoid mutex locks every poll_events call
+            // It doesn't matter if events are processed in the next iteration
+            return;
+        }
+        let mut events = self.events.lock().unwrap();
+        out.extend(events.drain(..));
+        self.new_events_hint = false;
     }
 }
 

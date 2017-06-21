@@ -2,8 +2,11 @@ package com.rust.webvr;
 
 import android.app.Activity;
 import android.app.Application;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.FrameLayout;
@@ -17,8 +20,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
 
     private static native void nativeOnPause(long ptr);
     private static native void nativeOnResume(long ptr);
-    private static native void nativeOnSurfaceCreated(long ptr);
-    private static native void nativeOnSurfaceChanged(long ptr);
+    private static native void nativeOnSurfaceChanged(long ptr, Surface surface);
     private static native void nativeOnSurfaceDestroyed(long ptr);
 
     void init(final Activity activity, long ptr) {
@@ -30,6 +32,9 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
             public void run() {
                 mSurfaceView = new SurfaceView(activity);
                 mSurfaceView.getHolder().addCallback(OVRService.this);
+                // Enabling setZOrderOnTop is very important! If not enabled a simple swap_buffers
+                // on the window will make the SurfaceView invisible
+                mSurfaceView.setZOrderOnTop(true);
                 activity.getApplication().registerActivityLifecycleCallbacks(OVRService.this);
 
                 // Wait until completed
@@ -50,13 +55,15 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
         }
     }
 
-    // Called from Native
-    public Object getSurfaceView() {
-        return mSurfaceView;
+    // Called from JNI
+    public static Object create(Activity activity, long ptr) {
+        OVRService service = new OVRService();
+        service.init(activity, ptr);
+        return service;
     }
 
     // Called from Native
-    public void enterVR() {
+    public void startPresent() {
         mActivity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -72,7 +79,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
         });
     }
 
-    public void exitVR() {
+    public void stopPresent() {
         mActivity.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -85,13 +92,6 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
                 rootLayout.removeView(mSurfaceView);
             }
         });
-    }
-
-    // Called from JNI
-    public static Object create(Activity activity, long ptr) {
-        OVRService service = new OVRService();
-        service.init(activity, ptr);
-        return service;
     }
 
     // ActivityLifecycleCallbacks
@@ -110,6 +110,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
         if (activity != mActivity) {
             return;
         }
+        Log.e("rust-webvr", "onActivityResumed");
         nativeOnResume(mPtr);
     }
 
@@ -118,6 +119,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
         if (activity != mActivity) {
             return;
         }
+        Log.e("rust-webvr", "onActivityPaused");
         nativeOnPause(mPtr);
     }
 
@@ -140,20 +142,20 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
     }
 
     // SurfaceView Callbacks
-
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        nativeOnSurfaceCreated(mPtr);
+        Log.e("rust-webvr", "surfaceCreated");
     }
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-        nativeOnSurfaceChanged(mPtr);
+        Log.e("rust-webvr", "surfaceChanged");
+        nativeOnSurfaceChanged(mPtr, holder.getSurface());
     }
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-    nativeOnSurfaceDestroyed(mPtr);
+        Log.e("rust-webvr", "surfaceDestroyed");
+        nativeOnSurfaceDestroyed(mPtr);
     }
-
 }

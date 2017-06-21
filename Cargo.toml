@@ -44,6 +44,3 @@ android_injected_glue = "0.2.2"
 [build-dependencies]
 gl_generator = "0.5.0"
 
-[replace]
-
-"ovr-mobile-sys:0.1.0"  = { path="/home/mortimer/Projects/ovr-mobile-sys" }

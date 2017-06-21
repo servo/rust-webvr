@@ -218,7 +218,7 @@ impl VRDisplay for GoogleVRDisplay {
         self.presenting = false;
         unsafe {
             if let Ok(jni_scope) = JNIScope::attach() {
-                let jni = jni_scope.jni;
+                let jni = jni_scope.jni();
                 let env = jni_scope.env;
                 let method = jni_scope.get_method((*self.service).java_class, "stopPresent", "()V", false);
                 (jni.CallVoidMethod)(env, (*self.service).java_object, method);

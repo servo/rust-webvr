@@ -588,6 +588,14 @@ pub fn main() {
             }
         }
 
+        // debug controllers
+        let gamepads = vr.get_gamepads();
+        for gamepad in gamepads {
+            let gamepad = gamepad.borrow();
+            println!("Gamepad Data: {:?}", gamepad.data());
+            println!("Gamepad State: {:?}", gamepad.state());
+        }
+
         // We don't need to poll VR headset events every frame
         event_counter += 1;
         if event_counter % 100 == 0 {

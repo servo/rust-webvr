@@ -1,8 +1,8 @@
 #![cfg(target_os="android")]
 #![cfg(feature = "oculusvr")]
 
-use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
-    VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer};
+use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREvent, VRDisplayEvent, 
+    VREyeParameters, VRFrameData, VRLayer};
 use android_injected_glue::ffi as ndk;
 use gl;
 use ovr_mobile_sys as ovr;
@@ -13,6 +13,7 @@ use std::mem;
 use std::os::raw::c_void;
 use std::ptr;
 use std::sync::{Arc, Condvar, Mutex};
+use super::gamepad::{OculusVRGamepad, OculusVRGamepadPtr};
 use super::jni_utils::JNIScope;
 use super::service::{OVRJava, OVRServiceJava};
 use super::super::utils;
@@ -54,6 +55,8 @@ pub struct OculusVRDisplay {
     pending_action: Mutex<Option<LifeCycleAction>>,
     // waiting for an event to occur. 
     leave_vr_condition: (Mutex<bool>, Condvar),
+    // Gamepads linked to this display
+    gamepads: Vec<OculusVRGamepadPtr>,
 }
 
 unsafe impl Send for OculusVRDisplay {}
@@ -259,6 +262,7 @@ impl OculusVRDisplay {
             new_pending_action_hint: false,
             pending_action: Mutex::new(None),
             leave_vr_condition: (Mutex::new(false), Condvar::new()),
+            gamepads: Vec::new(),
         }))
     }
 
@@ -294,7 +298,15 @@ impl OculusVRDisplay {
         self.ovr = unsafe { ovr::vrapi_EnterVrMode(&mode) };
         if self.ovr.is_null() {
             error!("Entering VR mode failed because the ANativeWindow was not valid.");
+            return;
         }
+
+        unsafe {
+            ovr::vrapi_SetRemoteEmulation(self.ovr, false);
+        }
+
+        // Refresh gamepads after entering VR mode
+        OculusVRGamepad::refresh_available_gamepads(self.ovr, self.display_id, &mut self.gamepads);
     }
 
     fn exit_vr_mode(&mut self) {
@@ -302,6 +314,13 @@ impl OculusVRDisplay {
             debug!("Exit VR Mode");
             let ovr = self.ovr;
             self.ovr = ptr::null_mut();
+
+            // Disable gamepads
+            for gamepad in &self.gamepads {
+                gamepad.borrow_mut().on_exit_vrmode();
+            }
+
+            // Exit VR mode
             unsafe {
                 ovr::vrapi_LeaveVrMode(ovr);
             }
@@ -535,6 +554,10 @@ impl OculusVRDisplay {
         out.extend(events.drain(..));
         self.new_events_hint = false;
     }
+
+    pub fn fetch_gamepads(&self, out: &mut Vec<OculusVRGamepadPtr>) {
+        out.extend(self.gamepads.iter().cloned());
+    }
 }
 
 struct OculusEyeFramebuffer {
@@ -606,11 +629,11 @@ fn ovr_mat4_to_array(matrix: &ovr::ovrMatrix4f) -> [f32; 16] {
 }
 
 #[inline]
-fn ovr_quat_to_array(q: &ovr::ovrQuatf) -> [f32; 4] {
+pub fn ovr_quat_to_array(q: &ovr::ovrQuatf) -> [f32; 4] {
     [q.x, q.y, q.z, q.w]
 }
 
 #[inline]
-fn ovr_vec3_to_array(v: &ovr::ovrVector3f) -> [f32; 3] {
+pub fn ovr_vec3_to_array(v: &ovr::ovrVector3f) -> [f32; 3] {
     [v.x, v.y, v.z]
 }

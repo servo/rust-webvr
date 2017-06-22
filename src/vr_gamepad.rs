@@ -66,3 +66,12 @@ pub struct VRGamepadButton {
     pub pressed: bool,
     pub touched: bool
 }
+
+impl VRGamepadButton {
+    pub fn new(pressed: bool) -> Self {
+        Self {
+            pressed: pressed,
+            touched: pressed,
+        }
+    }
+}

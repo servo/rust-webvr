@@ -1,14 +1,13 @@
 #![cfg(target_os="android")]
 #![cfg(feature = "oculusvr")]
 
-use {VRService, VRDisplay, VRDisplayPtr, VREvent, VRGamepadPtr};
+use {VRService, VRDisplayPtr, VREvent, VRGamepadPtr};
 use android_injected_glue as android;
 use android_injected_glue::ffi as ndk;
 use ovr_mobile_sys as ovr;
 use std::mem;
 use std::ptr;
 use super::display::{OculusVRDisplay, OculusVRDisplayPtr};
-use super::gamepad::{OculusVRGamepad, OculusVRGamepadPtr};
 use super::jni_utils::JNIScope;
 
 const SERVICE_CLASS_NAME:&'static str = "com/rust/webvr/OVRService"; 
@@ -16,7 +15,6 @@ const SERVICE_CLASS_NAME:&'static str = "com/rust/webvr/OVRService";
 pub struct OculusVRService {
     initialized: bool,
     displays: Vec<OculusVRDisplayPtr>,
-    gamepads: Vec<OculusVRGamepadPtr>,
     service_java: OVRServiceJava,
     ovr_java: OVRJava,
     // SurfaceView Life cycle
@@ -57,22 +55,15 @@ impl VRService for OculusVRService {
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
-        // Return cached gamepads if available
-        if self.is_initialized() && self.gamepads.len() > 0 {
-            return Ok(self.clone_gamepads());
-        }
         try!(self.initialize());
 
-        let gamepad = unsafe {
-            let display_id = match self.displays.first() {
-                Some(display) => display.borrow().id(),
-                None => 0
-            };
-            try!(OculusVRGamepad::new(display_id))
-        };
-        self.gamepads.push(gamepad);
-        
-        Ok(self.clone_gamepads())
+        let mut result = Vec::new();
+        for display in &self.displays {
+            display.borrow().fetch_gamepads(&mut result);
+        }
+
+        let result = result.drain(0..).map(|d| d as VRGamepadPtr).collect();
+        Ok(result)
     }
 
     fn is_available(&self) -> bool {
@@ -93,7 +84,6 @@ impl OculusVRService {
         OculusVRService {
             initialized: false,
             displays: Vec::new(),
-            gamepads: Vec::new(),
             service_java: OVRServiceJava::default(),
             ovr_java: OVRJava::default(),
             resume_received: true, // True because Activity is already resumed when service initialized
@@ -152,22 +142,12 @@ impl OculusVRService {
         self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
     }
 
-    fn clone_gamepads(&self) -> Vec<VRGamepadPtr> {
-        self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect()
-    }
-
     // Called from Java main thread
     // Pause & resume methods are thread safe
     fn on_pause(&mut self) {
         for display in &self.displays {
             unsafe {
                 (*display.as_ptr()).pause();
-            }
-        }
-
-        for gamepad in &self.gamepads {
-            unsafe {
-                (*gamepad.as_ptr()).pause();
             }
         }
     }
@@ -178,11 +158,6 @@ impl OculusVRService {
         for display in &self.displays {
             unsafe {
                 (*display.as_ptr()).resume();
-            }
-        }
-        for gamepad in &self.gamepads {
-            unsafe {
-                (*gamepad.as_ptr()).resume();
             }
         }
     }

@@ -1,7 +1,3 @@
-#![feature(custom_attribute)]
-#![feature(custom_derive)]
-#![cfg_attr(feature = "openvr", feature(untagged_unions))]
-
 #[macro_use]
 macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);

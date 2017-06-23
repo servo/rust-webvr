@@ -135,6 +135,10 @@ impl VRDisplay for OculusVRDisplay {
         self.frame_index += 1;
         self.predicted_display_time =  unsafe { ovr::vrapi_GetPredictedDisplayTime(self.ovr, self.frame_index) };
         self.predicted_tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, self.predicted_display_time) };
+
+        if self.gamepads.len() < 2 {
+            OculusVRGamepad::refresh_available_gamepads(self.ovr, self.display_id, &mut self.gamepads);
+        }
     }
 
     fn submit_frame(&mut self, layer: &VRLayer) {

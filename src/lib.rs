@@ -20,7 +20,6 @@ extern crate serde_derive;
 extern crate time;
 
 #[cfg(any(feature = "googlevr", feature= "oculusvr"))]
-#[cfg(target_os = "android")]
 mod gl {
     include!(concat!(env!("OUT_DIR"), "/gles_bindings.rs"));
 }

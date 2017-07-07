@@ -3,7 +3,8 @@
 mod display;
 mod gamepad;
 mod service;
-mod jni_utils;
+#[cfg(target_os = "android")]
+use super::jni_utils;
 
 use {VRService, VRServiceCreator};
 

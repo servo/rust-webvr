@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"
@@ -26,6 +26,7 @@ default = ["openvr", "mock"]
 openvr = ["libloading"]
 mock = []
 googlevr = ["gvr-sys"]
+oculusvr = ["ovr-mobile-sys"]
 serde-serialization = ["serde", "serde_derive"]
 
 [dependencies]
@@ -34,10 +35,12 @@ serde = { version = "1.0", optional = true }
 serde_derive = { version = "1.0", optional = true }
 time = "0.1"
 libloading = { version = "0.4", optional = true, default-features = false }
-gvr-sys = { version = "0.3", optional = true }
+gvr-sys = { version = "0.4", optional = true }
+ovr-mobile-sys = { version = "0.3.1", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_injected_glue = "0.2.2"
 
 [build-dependencies]
 gl_generator = "0.5.0"
+

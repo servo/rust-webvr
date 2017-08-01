@@ -417,9 +417,10 @@ pub fn main() {
     let height = 3.0f32;
     let depth = 5.5f32;
 
+    let events_loop = glutin::EventsLoop::new();
     let window = glutin::WindowBuilder::new().with_dimensions(window_width, window_height) //.with_vsync()
                                              .with_gl(gl_version())
-                                             .build().unwrap();
+                                             .build(&events_loop).unwrap();
     unsafe {
         window.make_current().unwrap();
     }
@@ -576,7 +577,7 @@ pub fn main() {
         debug_assert_eq!(gl.get_error(), gl::NO_ERROR);
 
         // We don't need to swap buffer on Android because Daydream view is on top of the window.
-        if !cfg!(target_os = "android") {
+        //if !cfg!(target_os = "android") {
             match window.swap_buffers() {
                 Err(error) => {
                     match error {
@@ -586,7 +587,7 @@ pub fn main() {
                 },
                 Ok(_) => {},
             }
-        }
+        //}
 
         // debug controllers
         let gamepads = vr.get_gamepads();
@@ -623,11 +624,18 @@ pub fn main() {
         }
 
         // Window Events
-        for event in window.poll_events() {
+        let mut running = true;
+        events_loop.poll_events(|event| {
             match event {
-                glutin::Event::Closed => return,
-                _ => {}
+                glutin::Event::WindowEvent{ event: glutin::WindowEvent::Closed, .. } => {
+                    running = false;
+                },
+                _ => ()
             }
+        });
+
+        if !running {
+            return
         }
     }
 }

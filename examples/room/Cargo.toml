@@ -5,7 +5,7 @@ authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-glutin = "0.7.4"
+glutin = "0.8.1"
 gleam = "0.4"
 cgmath = "0.12"
 image = "0.12"
@@ -16,4 +16,7 @@ android_injected_glue = {git = "https://github.com/mmatyas/android-rs-injected-g
 
 [dependencies.rust-webvr]
 path = "../.."
+
+[replace]
+"glutin:0.8.1" = { path="/home/mortimer/Projects/glutin" }
 

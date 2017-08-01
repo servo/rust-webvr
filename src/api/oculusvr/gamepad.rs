@@ -6,7 +6,7 @@ use ovr_mobile_sys as ovr;
 use ovr_mobile_sys::ovrButton::*;
 use ovr_mobile_sys::ovrControllerCapabilties::*;
 use ovr_mobile_sys::ovrControllerType::*;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::mem;
 use std::ptr;
 use std::sync::Arc;
@@ -23,6 +23,7 @@ pub struct OculusVRGamepad {
     capabilities: InputCapabilities,
     gamepad_id: u32,
     display_id: u32,
+    predicted_display_time: Cell<f64>,
 }
 
 unsafe impl Send for OculusVRGamepad {}
@@ -45,6 +46,7 @@ impl OculusVRGamepad {
             capabilities: capabilities.unwrap_or_default(),
             gamepad_id: utils::new_id(),
             display_id: display_id,
+            predicted_display_time: Cell::new(0.0),
         };
 
         Arc::new(RefCell::new(gamepad))
@@ -155,7 +157,10 @@ impl OculusVRGamepad {
     fn fetch_tracking_state(&self, out: &mut VRGamepadState) {
         let mut tracking: ovr::ovrTracking = unsafe { mem::uninitialized() };
         let status = unsafe {
-             ovr::vrapi_GetInputTrackingState(self.ovr, self.ovr_id, 0.0, &mut tracking)
+             ovr::vrapi_GetInputTrackingState(self.ovr,
+                                              self.ovr_id,
+                                              self.predicted_display_time.get(),
+                                              &mut tracking)
         };
 
         if status != ovr::ovrSuccessResult::ovrSuccess as i32 {
@@ -170,6 +175,10 @@ impl OculusVRGamepad {
         if self.capabilities.controller_capabilities & (ovrControllerCaps_HasPositionTracking as u32) > 0 {
             out.pose.position = Some(ovr_vec3_to_array(&tracking.HeadPose.Pose.Position));
         }
+    }
+
+    pub fn set_predicted_display_time(&self, time: f64) {
+        self.predicted_display_time.set(time);
     }
 }
 

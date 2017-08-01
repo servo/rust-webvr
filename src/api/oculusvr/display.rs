@@ -139,6 +139,10 @@ impl VRDisplay for OculusVRDisplay {
         if self.gamepads.len() < 2 {
             OculusVRGamepad::refresh_available_gamepads(self.ovr, self.display_id, &mut self.gamepads);
         }
+
+        for gamepad in &self.gamepads {
+            gamepad.borrow().set_predicted_display_time(self.predicted_display_time);
+        }
     }
 
     fn submit_frame(&mut self, layer: &VRLayer) {

@@ -107,7 +107,7 @@ impl VRDisplay for MockVRDisplay {
     }
 
     fn reset_pose(&mut self) {
-
+        // No op
     }
 
     fn sync_poses(&mut self) {
@@ -115,8 +115,20 @@ impl VRDisplay for MockVRDisplay {
         thread::sleep(Duration::from_millis(1));
     }
 
-    fn submit_frame(&mut self, _layer: &VRLayer) {
+    fn bind_framebuffer(&mut self, _eye_index: u32) {
+        // No op
+    }
 
+    fn framebuffer_count(&self) -> u32 {
+        2
+    }
+
+    fn render_layer(&mut self, _layer: &VRLayer) {
+        // No op
+    }
+
+    fn submit_frame(&mut self) {
+        // No op
     }
 }
 

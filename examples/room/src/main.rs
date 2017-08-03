@@ -6,7 +6,9 @@ use gleam::gl::{self, Gl, GLenum, GLint, GLuint};
 extern crate glutin;
 extern crate cgmath;
 extern crate image;
+
 use self::cgmath::*;
+use glutin::GlContext;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 use std::mem;
@@ -417,10 +419,14 @@ pub fn main() {
     let height = 3.0f32;
     let depth = 5.5f32;
 
-    let events_loop = glutin::EventsLoop::new();
-    let window = glutin::WindowBuilder::new().with_dimensions(window_width, window_height) //.with_vsync()
-                                             .with_gl(gl_version())
-                                             .build(&events_loop).unwrap();
+    let mut events_loop = glutin::EventsLoop::new();
+    let window = glutin::WindowBuilder::new()
+                .with_title("rust-webvr Room Scale")
+                .with_dimensions(window_width, window_height);
+    let gl_context = glutin::ContextBuilder::new()
+                     .with_gl(gl_version());
+    let window = glutin::GlWindow::new(window, gl_context, &events_loop).unwrap();
+
     unsafe {
         window.make_current().unwrap();
     }
@@ -577,7 +583,7 @@ pub fn main() {
         debug_assert_eq!(gl.get_error(), gl::NO_ERROR);
 
         // We don't need to swap buffer on Android because Daydream view is on top of the window.
-        //if !cfg!(target_os = "android") {
+        if !cfg!(target_os = "android") {
             match window.swap_buffers() {
                 Err(error) => {
                     match error {
@@ -587,14 +593,16 @@ pub fn main() {
                 },
                 Ok(_) => {},
             }
-        //}
+        }
 
         // debug controllers
-        let gamepads = vr.get_gamepads();
-        for gamepad in gamepads {
-            let gamepad = gamepad.borrow();
-            println!("Gamepad Data: {:?}", gamepad.data());
-            println!("Gamepad State: {:?}", gamepad.state());
+        if cfg!(debug) {
+            let gamepads = vr.get_gamepads();
+            for gamepad in gamepads {
+                let gamepad = gamepad.borrow();
+                println!("Gamepad Data: {:?}", gamepad.data());
+                println!("Gamepad State: {:?}", gamepad.state());
+            }
         }
 
         // We don't need to poll VR headset events every frame

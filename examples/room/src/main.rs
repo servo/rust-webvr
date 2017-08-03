@@ -417,6 +417,11 @@ pub fn main() {
     let height = 3.0f32;
     let depth = 5.5f32;
 
+    // We can use data.left_view_matrix or data.pose to render the scene
+    let test_pose = false;
+    // Draw to the HDM frmebuffer directly instead of using a texture
+    let direct_draw = true; 
+
     let window = glutin::WindowBuilder::new().with_dimensions(window_width, window_height) //.with_vsync()
                                              .with_gl(gl_version())
                                              .build().unwrap();
@@ -465,7 +470,12 @@ pub fn main() {
     let fbo_to_screen = Mesh::new_quad(gl, target_texture);
 
     let left_viewport = (0i32, 0i32, render_width as i32, render_height as i32);
-    let right_viewport = (render_width as i32, 0i32, render_width as i32, render_height as i32);
+    let right_viewport = if direct_draw {
+        // Viewports are the same when using direct_draw instead of side by side textures.
+        left_viewport
+    } else {
+        (render_width as i32, 0i32, render_width as i32, render_height as i32)
+    };
 
     let mut standing_transform = if let Some(ref stage) = display_data.stage_parameters {
         vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
@@ -489,9 +499,6 @@ pub fn main() {
 
     let mut event_counter = 0u64;
 
-    // We can use data.left_view_matrix or data.pose to render the scene
-    let test_pose = false; 
-
     loop {
         display.borrow_mut().sync_poses();
 
@@ -501,9 +508,11 @@ pub fn main() {
             standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap();
         }
 
-        gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
-        gl.clear_color(1.0, 0.0, 0.0, 1.0);
-        gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+        if !direct_draw {
+            gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
+            gl.clear_color(1.0, 0.0, 0.0, 1.0);
+            gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+        }
 
         let data: VRFrameData = display.borrow().synced_frame_data(near, far);
 
@@ -537,15 +546,25 @@ pub fn main() {
         gl.enable_vertex_attrib_array(0); // position
         gl.enable_vertex_attrib_array(1); // uv
 
-        for eye in &eyes {
+        for (i, eye) in eyes.iter().enumerate() {
             let viewport = eye.0;
             let projection = vec_to_matrix(eye.1);
             let eye_view = eye.2 * standing_transform;
+
+            if direct_draw {
+                // bind the eye framebuffer for direct draw
+                display.borrow_mut().bind_framebuffer(i as u32);
+            }
 
             gl.uniform_matrix_4fv(prog.loc("projection"), false, matrix_to_uniform(&projection));
             gl.uniform_matrix_4fv(prog.loc("view"), false, matrix_to_uniform(&eye_view));
             gl.viewport(viewport.0, viewport.1, viewport.2, viewport.3);
             gl.scissor(viewport.0, viewport.1, viewport.2, viewport.3);
+
+            if direct_draw {
+                gl.clear_color(1.0, 0.0, 0.0, 1.0);
+                gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+            }
 
             for mesh in &meshes {
                 gl.uniform_matrix_4fv(prog.loc("model"), false, matrix_to_uniform(&mesh.transform));
@@ -560,7 +579,13 @@ pub fn main() {
             texture_id: target_texture,
             .. Default::default()
         };
-        display.borrow_mut().submit_frame(&layer);
+
+        if direct_draw {
+            display.borrow_mut().submit_frame();
+        } else {
+            display.borrow_mut().render_layer(&layer);
+            display.borrow_mut().submit_frame();
+        }
 
         // render to desktop display
         gl.bind_framebuffer(gl::FRAMEBUFFER, screen_fbo);
@@ -589,11 +614,13 @@ pub fn main() {
         }
 
         // debug controllers
-        let gamepads = vr.get_gamepads();
-        for gamepad in gamepads {
-            let gamepad = gamepad.borrow();
-            println!("Gamepad Data: {:?}", gamepad.data());
-            println!("Gamepad State: {:?}", gamepad.state());
+        if cfg!(debug) {
+            let gamepads = vr.get_gamepads();
+            for gamepad in gamepads {
+                let gamepad = gamepad.borrow();
+                println!("Gamepad Data: {:?}", gamepad.data());
+                println!("Gamepad State: {:?}", gamepad.state());
+            }
         }
 
         // We don't need to poll VR headset events every frame

@@ -57,6 +57,7 @@ pub struct OculusVRDisplay {
     leave_vr_condition: (Mutex<bool>, Condvar),
     // Gamepads linked to this display
     gamepads: Vec<OculusVRGamepadPtr>,
+    use_multiview: bool,
 }
 
 unsafe impl Send for OculusVRDisplay {}
@@ -125,7 +126,8 @@ impl VRDisplay for OculusVRDisplay {
         }
 
         if !self.is_in_vr_mode() {
-            self.start_present();
+            let use_multiview = self.use_multiview;
+            self.start_present(use_multiview);
         }
 
         if self.eye_framebuffers.is_empty() {
@@ -145,16 +147,22 @@ impl VRDisplay for OculusVRDisplay {
         }
     }
 
-    fn submit_frame(&mut self, layer: &VRLayer) {
+    fn bind_framebuffer(&mut self, eye_index: u32) {
+        let eye = &self.eye_framebuffers[eye_index as usize];
+        let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
+        unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, eye.fbos[swap_chain_index as usize]);
+        }
+    }
+
+    fn framebuffer_count(&self) -> u32 {
+        if self.use_multiview { 1 } else { 2 }
+    }
+
+    fn render_layer(&mut self, layer: &VRLayer) {
         if self.activity_paused || !self.is_in_vr_mode() {
             return;
         }
-
-        let mut frame_params = ovr::helpers::vrapi_DefaultFrameParms(self.render_ovr_java.handle(),
-                                                                     ovr::ovrFrameInit::VRAPI_FRAME_INIT_DEFAULT,
-                                                                     self.predicted_display_time,
-                                                                     ptr::null_mut());
-        frame_params.FrameIndex = self.frame_index;
 
         // Save current fbo to restore it when the frame is submitted.
         let mut current_fbo = 0;
@@ -162,7 +170,6 @@ impl VRDisplay for OculusVRDisplay {
             gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut current_fbo);
         }
 
-        let eye_projection = self.eye_projection.get();
         for (i, eye) in self.eye_framebuffers.iter_mut().enumerate() {
             let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
 
@@ -193,23 +200,52 @@ impl VRDisplay for OculusVRDisplay {
                                     0, 0, eye.width as i32, eye.height as i32,
                                     gl::COLOR_BUFFER_BIT, gl::LINEAR);
             }
+        }
+
+        // Restore bound fbo
+        unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
+        }
+    }
+
+    fn submit_frame(&mut self) {
+        if self.activity_paused || !self.is_in_vr_mode() {
+            return;
+        }
+
+        // Set up frame params
+        let mut frame_params = ovr::helpers::vrapi_DefaultFrameParms(self.render_ovr_java.handle(),
+                                                                     ovr::ovrFrameInit::VRAPI_FRAME_INIT_DEFAULT,
+                                                                     self.predicted_display_time,
+                                                                     ptr::null_mut());
+        frame_params.FrameIndex = self.frame_index;
+
+        let eye_projection = self.eye_projection.get();
+        let tex_coords = ovr::helpers::ovrMatrix4f_TanAngleMatrixFromProjection(&eye_projection);
+
+        for i in 0..VRAPI_FRAME_LAYER_EYE_MAX as usize {
+            let eye = if self.eye_framebuffers.len() > 0 {
+                &self.eye_framebuffers[i]
+            } else {
+                &self.eye_framebuffers[0]
+            };
+            
+            let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
 
             let target = &mut frame_params.Layers[0].Textures[i];
             target.ColorTextureSwapChain = eye.swap_chain;
             target.TextureSwapChainIndex = swap_chain_index;
-            target.TexCoordsFromTanAngles = ovr::helpers::ovrMatrix4f_TanAngleMatrixFromProjection(&eye_projection);
+            target.TexCoordsFromTanAngles = tex_coords;
             target.HeadPose = self.predicted_tracking.HeadPose;
             //frame_params.Layers[0].Textures[eye].CompletionFence = fence;
         }
 
         unsafe {
             ovr::vrapi_SubmitFrame(self.ovr, &frame_params);
-            // Restore bound fbo
-            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
         }
     }
 
-    fn start_present(&mut self) {
+    fn start_present(&mut self, use_multiview: bool) {
         if self.presenting == false {
             // Show the SurfaceView on top of the Android view Hierarchy
             unsafe {
@@ -226,6 +262,7 @@ impl VRDisplay for OculusVRDisplay {
             return;
         }
         self.presenting = true;
+        self.use_multiview = use_multiview;
         self.enter_vr_mode();
     }
 
@@ -271,6 +308,7 @@ impl OculusVRDisplay {
             pending_action: Mutex::new(None),
             leave_vr_condition: (Mutex::new(false), Condvar::new()),
             gamepads: Vec::new(),
+            use_multiview: false,
         }))
     }
 

@@ -1,4 +1,4 @@
-use {VRDisplay, VRDisplayData, VRFrameData, VRStageParameters, VRLayer};
+use {VRDisplay, VRDisplayData, VRFramebuffer, VRFrameData, VRStageParameters, VRLayer, VRViewport};
 use super::super::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -115,12 +115,19 @@ impl VRDisplay for MockVRDisplay {
         thread::sleep(Duration::from_millis(1));
     }
 
-    fn bind_framebuffer(&mut self, _eye_index: u32) {
+    fn bind_framebuffer(&mut self, _index: u32) {
         // No op
     }
 
-    fn framebuffer_count(&self) -> u32 {
-        2
+    fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
+        vec![VRFramebuffer {
+                multiview: false,
+                viewport: VRViewport::new(0, 0, 1512/2, 1680)
+            },
+            VRFramebuffer {
+                multiview: false,
+                viewport: VRViewport::new(1512/2, 0, 1512/2, 1680)
+            }]
     }
 
     fn render_layer(&mut self, _layer: &VRLayer) {

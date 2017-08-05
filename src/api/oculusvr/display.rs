@@ -2,7 +2,7 @@
 #![cfg(feature = "oculusvr")]
 
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREvent, VRDisplayEvent, 
-    VREyeParameters, VRFrameData, VRLayer};
+    VREyeParameters, VRFramebuffer, VRFrameData, VRLayer, VRViewport};
 use android_injected_glue::ffi as ndk;
 use gl;
 use ovr_mobile_sys as ovr;
@@ -130,10 +130,6 @@ impl VRDisplay for OculusVRDisplay {
             self.start_present(use_multiview);
         }
 
-        if self.eye_framebuffers.is_empty() {
-            self.create_swap_chains();
-            debug_assert!(!self.eye_framebuffers.is_empty());
-        }
         self.frame_index += 1;
         self.predicted_display_time =  unsafe { ovr::vrapi_GetPredictedDisplayTime(self.ovr, self.frame_index) };
         self.predicted_tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, self.predicted_display_time) };
@@ -148,6 +144,9 @@ impl VRDisplay for OculusVRDisplay {
     }
 
     fn bind_framebuffer(&mut self, eye_index: u32) {
+        if self.activity_paused || !self.is_in_vr_mode() {
+            return;
+        }
         let eye = &self.eye_framebuffers[eye_index as usize];
         let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
         unsafe {
@@ -155,8 +154,13 @@ impl VRDisplay for OculusVRDisplay {
         }
     }
 
-    fn framebuffer_count(&self) -> u32 {
-        if self.use_multiview { 1 } else { 2 }
+    fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
+        self.eye_framebuffers.iter().map(|fbo| {
+            VRFramebuffer {
+                multiview: false,
+                viewport: VRViewport::new(0, 0, fbo.width as i32, fbo.height as i32)
+            }
+        }).collect()
     }
 
     fn render_layer(&mut self, layer: &VRLayer) {
@@ -261,6 +265,12 @@ impl VRDisplay for OculusVRDisplay {
             error!("Failed to attach to JavaThread {}", error);
             return;
         }
+
+        if self.eye_framebuffers.is_empty() {
+            self.create_swap_chains();
+            debug_assert!(!self.eye_framebuffers.is_empty());
+        }
+
         self.presenting = true;
         self.use_multiview = use_multiview;
         self.enter_vr_mode();

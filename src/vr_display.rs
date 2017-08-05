@@ -1,4 +1,4 @@
-use {VRDisplayData, VRFrameData, VRLayer};
+use {VRDisplayData, VRFramebuffer, VRFrameData, VRLayer};
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
@@ -31,13 +31,13 @@ pub trait VRDisplay: Send + Sync {
 
     // Binds the framebuffer to directly render to the HDM
     // Must be called in the render thread, before doing any work
-    fn bind_framebuffer(&mut self, eye_index: u32);
+    fn bind_framebuffer(&mut self, index: u32);
 
-    // Returns the number of framebuffers required to render to all eyes
+    // Returns the available FBOs that must be used to render to all eyes
     // Must be called in the render thread, before doing any work
-    fn framebuffer_count(&self) -> u32;
+    fn get_framebuffers(&self) -> Vec<VRFramebuffer>;
 
-    // Renders a VRLayer
+    // Renders a VRLayer from a external texture
     // Must be called in the render thread
     fn render_layer(&mut self, layer: &VRLayer);
 

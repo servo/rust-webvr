@@ -469,22 +469,6 @@ pub fn main() {
 
     let fbo_to_screen = Mesh::new_quad(gl, target_texture);
 
-    let left_viewport = (0i32, 0i32, render_width as i32, render_height as i32);
-    let right_viewport = if direct_draw {
-        // Viewports are the same when using direct_draw instead of side by side textures.
-        left_viewport
-    } else {
-        (render_width as i32, 0i32, render_width as i32, render_height as i32)
-    };
-
-    let mut standing_transform = if let Some(ref stage) = display_data.stage_parameters {
-        vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
-    } else {
-        // Stage parameters not available yet or unsupported
-        // Assume 0.75m transform height
-        vec_to_translation(&[0.0, 1.75, 0.0]).inverse_transform().unwrap()
-    };
-
     let framebuffer = gl.gen_framebuffers(1)[0];
     let depth_buffer = gl.gen_renderbuffers(1)[0];
     gl.bind_renderbuffer(gl::RENDERBUFFER, depth_buffer);
@@ -497,6 +481,35 @@ pub fn main() {
     gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
     gl.bind_framebuffer(gl::FRAMEBUFFER, 0);
 
+    let mut standing_transform = if let Some(ref stage) = display_data.stage_parameters {
+        vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
+    } else {
+        // Stage parameters not available yet or unsupported
+        // Assume 0.75m transform height
+        vec_to_translation(&[0.0, 1.75, 0.0]).inverse_transform().unwrap()
+    };
+
+    // Configure VR presentation parameters
+    display.borrow_mut().start_present(false);
+
+    let vr_fbos = display.borrow().get_framebuffers();
+
+    // Set up viewports for both eyes
+    let left_viewport = if direct_draw { 
+        let fbo = vr_fbos.get(0).unwrap();
+        (fbo.viewport.x, fbo.viewport.y, fbo.viewport.width, fbo.viewport.height)
+    } else {
+        (0i32, 0i32, render_width as i32, render_height as i32)
+    };
+
+    let right_viewport = if direct_draw {
+        let fbo = vr_fbos.get(1).unwrap();
+        (fbo.viewport.x, fbo.viewport.y, fbo.viewport.width, fbo.viewport.height)
+    } else {
+        (render_width as i32, 0i32, render_width as i32, render_height as i32)
+    };
+
+
     let mut event_counter = 0u64;
 
     loop {
@@ -506,12 +519,6 @@ pub fn main() {
         if let Some(ref stage) = display_data.stage_parameters {
             // TODO: use event queue instead of checking this every frame
             standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap();
-        }
-
-        if !direct_draw {
-            gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
-            gl.clear_color(1.0, 0.0, 0.0, 1.0);
-            gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
         }
 
         let data: VRFrameData = display.borrow().synced_frame_data(near, far);
@@ -540,6 +547,14 @@ pub fn main() {
             (&right_viewport, &data.right_projection_matrix, &right_view_matrix)
         ];
 
+        if !direct_draw {
+            // Render to texture
+            gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
+            gl.clear_color(1.0, 0.0, 0.0, 1.0);
+            gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+        }
+
+        gl.enable(gl::SCISSOR_TEST);
         gl.use_program(prog.id);
         gl.active_texture(gl::TEXTURE0);
         gl.uniform_1i(prog.loc("sampler"), 0);
@@ -572,7 +587,13 @@ pub fn main() {
             }
         }
 
-        gl.flush();
+       
+        if !direct_draw {
+            gl.flush();
+        }
+        // Disable scissor before submitting the frame to the display.
+        // I found some problems on Gear VR if scissor is enabled when submitting the frame.
+        gl.disable(gl::SCISSOR_TEST);
 
         // Render to HMD
         let layer = VRLayer {

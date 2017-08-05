@@ -1,6 +1,6 @@
 #![cfg(feature = "googlevr")]
-use {VRDisplay, VRDisplayData, VRDisplayCapabilities,
-    VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer};
+use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VRFramebuffer,
+    VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer, VRViewport};
 use super::service::GoogleVRService;
 use super::super::utils;
 #[cfg(target_os="android")]
@@ -40,7 +40,8 @@ pub struct GoogleVRDisplay {
     paused: bool,
     new_events_hint: bool,
     pending_events: Mutex<Vec<VREvent>>,
-    processed_events: Mutex<Vec<VREvent>>
+    processed_events: Mutex<Vec<VREvent>>,
+    use_multiview: bool,
 }
 
 unsafe impl Send for GoogleVRDisplay {}
@@ -107,13 +108,8 @@ impl VRDisplay for GoogleVRDisplay {
     fn sync_poses(&mut self) {
         self.handle_events();
         if !self.presenting {
-            self.start_present();
-        }
-        if self.swap_chain.is_null() {
-            unsafe {
-                self.initialize_gl();
-                debug_assert!(!self.swap_chain.is_null());
-            }
+            let multiview = self.use_multiview;
+            self.start_present(multiview);
         }
 
         unsafe {
@@ -138,16 +134,33 @@ impl VRDisplay for GoogleVRDisplay {
         let mut time = unsafe { gvr::gvr_get_time_point_now() };
         time.monotonic_system_time_nanos += PREDICTION_OFFSET_NANOS;
         self.synced_head_matrix = self.fetch_head_matrix(&time);
-        //println!("sync_poses");
     }
 
-    fn submit_frame(&mut self, layer: &VRLayer) {
+    fn bind_framebuffer(&mut self, _eye_index: u32) {
+        // No op
         if self.frame.is_null() {
             warn!("null frame with context");
             return;
         }
+
+        unsafe {
+            gvr::gvr_frame_bind_buffer(self.frame, 0);
+        }
+    }
+
+    fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
+        vec![VRFramebuffer {
+                multiview: false,
+                viewport: VRViewport::new(0, 0, self.render_size.width/2, self.render_size.height)
+            },
+            VRFramebuffer {
+                multiview: false,
+                viewport: VRViewport::new(self.render_size.width/2, 0, self.render_size.width/2, self.render_size.height)
+            }]
+    }
+
+    fn render_layer(&mut self, layer: &VRLayer) {
         debug_assert!(self.fbo_id > 0);
-        //println!("submit_frame");
 
         unsafe {
             // Save current fbo to restore it when the frame is submitted.
@@ -175,21 +188,29 @@ impl VRDisplay for GoogleVRDisplay {
                                 0, 0, self.render_size.width, self.render_size.height,
                                 gl::COLOR_BUFFER_BIT, gl::LINEAR);
             gvr::gvr_frame_unbind(self.frame);
+            // Restore bound fbo
+            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
 
             // set up uvs
             gvr::gvr_buffer_viewport_set_source_uv(self.left_eye_vp, gvr_texture_bounds(&layer.left_bounds));
             gvr::gvr_buffer_viewport_set_source_uv(self.right_eye_vp, gvr_texture_bounds(&layer.right_bounds));
+        }
+    }
 
+    fn submit_frame(&mut self) {
+        if self.frame.is_null() {
+            warn!("null frame with context");
+            return;
+        }
+
+        unsafe {
             // submit frame
             gvr::gvr_frame_submit(mem::transmute(&self.frame), self.viewport_list, self.synced_head_matrix);
-
-            // Restore bound fbo
-            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
         }
     }
 
     #[cfg(target_os = "android")]
-    fn start_present(&mut self) {
+    fn start_present(&mut self, use_multiview: bool) {
         if self.presenting {
             return;
         }
@@ -202,11 +223,27 @@ impl VRDisplay for GoogleVRDisplay {
                 (jni.CallVoidMethod)(env, (*self.service).java_object, method);
             }
         }
+
+        if self.swap_chain.is_null() {
+            unsafe {
+                self.initialize_gl();
+                debug_assert!(!self.swap_chain.is_null());
+            }
+        }
     }
 
     #[cfg(not(target_os = "android"))]
     fn start_present(&mut self) {
+        if self.presenting {
+            return;
+        }
         self.presenting = true;
+        if self.swap_chain.is_null() {
+            unsafe {
+                self.initialize_gl();
+                debug_assert!(!self.swap_chain.is_null());
+            }
+        }
     }
 
     // Hint to indicate that we are going to stop sending frames to the device
@@ -271,11 +308,14 @@ impl GoogleVRDisplay {
             paused: false,
             new_events_hint: false,
             pending_events: Mutex::new(Vec::new()),
-            processed_events: Mutex::new(Vec::new())
+            processed_events: Mutex::new(Vec::new()),
+            use_multiview: false,
         }))
     }
 
     unsafe fn initialize_gl(&mut self) {
+        // Note: In some scenarios gvr_initialize_gl crashes if gvr_refresh_viewer_profile call isn't called before.
+        gvr::gvr_refresh_viewer_profile(self.ctx);
         // Initializes gvr necessary GL-related objects.
         gvr::gvr_initialize_gl(self.ctx);
 

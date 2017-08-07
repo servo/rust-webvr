@@ -2,12 +2,30 @@
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRFramebuffer {
-    // True if the framebuffer uses multiview
-    pub multiview: bool,
+    // The attributes set up for this framebuffer
+    pub attributes: VRFramebufferAttributes,
 
     // UVs defining the texture bounds to present to the eye in UV space: [x,y,w,h]
     // Defaults to [0.0, 0.0, 0.5, 1.0]
     pub viewport: VRViewport,
+}
+
+#[derive(Debug, Copy, Clone)]
+#[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
+pub struct VRFramebufferAttributes {
+    pub multiview: bool,
+    pub depth: bool,
+    pub multisampling: bool,
+}
+
+impl Default for VRFramebufferAttributes {
+     fn default() -> VRFramebufferAttributes {
+         Self {
+            multiview: false,
+            depth: false,
+            multisampling: false,
+         }
+     }
 }
 
 #[derive(Debug, Clone)]

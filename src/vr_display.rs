@@ -1,4 +1,4 @@
-use {VRDisplayData, VRFramebuffer, VRFrameData, VRLayer};
+use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRLayer};
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
@@ -46,7 +46,7 @@ pub trait VRDisplay: Send + Sync {
     fn submit_frame(&mut self);
 
     // Hint to indicate that we are going to start sending frames to the device
-    fn start_present(&mut self, use_multiview: bool) {}
+    fn start_present(&mut self, _attributes: Option<VRFramebufferAttributes>) {}
 
     // Hint to indicate that we are going to stop sending frames to the device
     fn stop_present(&mut self) {}

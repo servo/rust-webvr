@@ -1,4 +1,4 @@
-use {VRDisplay, VRDisplayData, VRFramebuffer, VRFrameData, VRStageParameters, VRLayer, VRViewport};
+use {VRDisplay, VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRStageParameters, VRLayer, VRViewport};
 use super::super::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -7,7 +7,8 @@ use std::time::Duration;
 use std::thread;
 
 pub struct MockVRDisplay {
-    display_id: u32
+    display_id: u32,
+    attributes: VRFramebufferAttributes,
 }
 
 unsafe impl Send for MockVRDisplay {}
@@ -17,6 +18,7 @@ impl MockVRDisplay {
     pub fn new() -> MockVRDisplayPtr {
         Arc::new(RefCell::new(MockVRDisplay {
             display_id: utils::new_id(),
+            attributes: Default::default(),
         }))
     }
 }
@@ -121,11 +123,11 @@ impl VRDisplay for MockVRDisplay {
 
     fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
         vec![VRFramebuffer {
-                multiview: false,
+                attributes: self.attributes,
                 viewport: VRViewport::new(0, 0, 1512/2, 1680)
             },
             VRFramebuffer {
-                multiview: false,
+                attributes: self.attributes,
                 viewport: VRViewport::new(1512/2, 0, 1512/2, 1680)
             }]
     }
@@ -136,6 +138,12 @@ impl VRDisplay for MockVRDisplay {
 
     fn submit_frame(&mut self) {
         // No op
+    }
+
+    fn start_present(&mut self, attributes: Option<VRFramebufferAttributes>) {
+        if let Some(attributes) = attributes {
+            self.attributes = attributes;
+        }
     }
 }
 

@@ -47,7 +47,7 @@ pub use vr_display_data::VRDisplayData;
 pub use vr_display_capabilities::VRDisplayCapabilities;
 pub use vr_eye::VREye;
 pub use vr_eye_parameters::VREyeParameters;
-pub use vr_framebuffer::{VRFramebuffer, VRViewport};
+pub use vr_framebuffer::{VRFramebuffer, VRFramebufferAttributes, VRViewport};
 pub use vr_frame_data::VRFrameData;
 pub use vr_layer::VRLayer;
 pub use vr_pose::VRPose;

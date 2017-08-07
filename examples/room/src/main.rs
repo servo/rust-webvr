@@ -13,7 +13,7 @@ use std::mem;
 use std::path::Path;
 use std::{thread, time};
 
-use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData};
+use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData, VRFramebufferAttributes};
 
 type Vec3 = Vector3<f32>;
 type Mat4 = Matrix4<f32>;
@@ -49,6 +49,30 @@ const VERTEX_SHADER_MVP: &'static str = r#"
     void main() {
         v_uv = uv;
         gl_Position = projection * view * model * vec4(position, 1.0);
+    }
+"#;
+
+const VERTEX_SHADER_MVP_MULTIVIEW: &'static str = r#"
+	#define VIEW_ID gl_ViewID_OVR
+    #define NUM_VIEWS 2
+
+	#extension GL_OVR_multiview2 : enable
+	layout(num_views=NUM_VIEWS) in;
+
+    in vec3 position;
+    in vec2 uv;
+    out vec2 v_uv;
+
+    uniform mat4 left_projection;
+    uniform mat4 left_view;
+    uniform mat4 right_projection;
+    uniform mat4 right_view;
+    uniform mat4 model;
+
+    void main() {
+        v_uv = uv;
+        mat4 m = VIEW_ID > 0u ? (right_projection * right_view) : (left_projection * left_view);
+        gl_Position = m * model * vec4(position, 1.0);
     }
 "#;
 
@@ -420,7 +444,12 @@ pub fn main() {
     // We can use data.left_view_matrix or data.pose to render the scene
     let test_pose = false;
     // Draw to the HDM frmebuffer directly instead of using a texture
-    let direct_draw = true; 
+    let direct_draw = true;
+    let multiview = true;
+
+    if multiview && !direct_draw {
+        panic!("Configuration not supported: Multiview must use direct_draw.");
+    }
 
     let window = glutin::WindowBuilder::new().with_dimensions(window_width, window_height) //.with_vsync()
                                              .with_gl(gl_version())
@@ -451,8 +480,15 @@ pub fn main() {
 
     // texture to be used as a framebuffer
     let target_texture = build_fbo_texture(gl, render_width * 2, render_height);
-    let prog = build_program(gl, VERTEX_SHADER_MVP, FRAGMENT_SHADER,
-                             &["projection", "view", "model", "sampler"], &["position", "uv"]);
+    let prog = if multiview {
+        build_program(gl, VERTEX_SHADER_MVP_MULTIVIEW, FRAGMENT_SHADER,
+                      &["left_projection", "right_projection", "left_view", "right_view", "model", "sampler"],
+                      &["position", "uv"])
+    } else {
+        build_program(gl, VERTEX_SHADER_MVP, FRAGMENT_SHADER,
+                      &["projection", "view", "model", "sampler"],
+                      &["position", "uv"])
+    };
     let prog_fb = build_program(gl, VERTEX_SHADER_FB, FRAGMENT_SHADER2,
                              &["matrix", "sampler"], &["position", "uv"]);
 
@@ -490,20 +526,30 @@ pub fn main() {
     };
 
     // Configure VR presentation parameters
-    display.borrow_mut().start_present(false);
+    let attributes = VRFramebufferAttributes {
+        multiview: multiview,
+        depth: false,
+        multisampling: false,
+    };
+    display.borrow_mut().start_present(Some(attributes));
 
     let vr_fbos = display.borrow().get_framebuffers();
+    assert!(vr_fbos.len() > 0);
+
+    if multiview && !vr_fbos.first().unwrap().attributes.multiview {
+        panic!("Multiview not supported in this Device");
+    }
 
     // Set up viewports for both eyes
     let left_viewport = if direct_draw { 
-        let fbo = vr_fbos.get(0).unwrap();
+        let fbo = vr_fbos.first().unwrap();
         (fbo.viewport.x, fbo.viewport.y, fbo.viewport.width, fbo.viewport.height)
     } else {
         (0i32, 0i32, render_width as i32, render_height as i32)
     };
 
     let right_viewport = if direct_draw {
-        let fbo = vr_fbos.get(1).unwrap();
+        let fbo = vr_fbos.last().unwrap();
         (fbo.viewport.x, fbo.viewport.y, fbo.viewport.width, fbo.viewport.height)
     } else {
         (render_width as i32, 0i32, render_width as i32, render_height as i32)
@@ -571,8 +617,18 @@ pub fn main() {
                 display.borrow_mut().bind_framebuffer(i as u32);
             }
 
-            gl.uniform_matrix_4fv(prog.loc("projection"), false, matrix_to_uniform(&projection));
-            gl.uniform_matrix_4fv(prog.loc("view"), false, matrix_to_uniform(&eye_view));
+            if multiview {
+                gl.uniform_matrix_4fv(prog.loc("left_projection"), false, matrix_to_uniform(&projection));
+                gl.uniform_matrix_4fv(prog.loc("left_view"), false, matrix_to_uniform(&eye_view));
+                let right_projection = vec_to_matrix(eyes[1].1);
+                let right_eye_view = eyes[1].2 * standing_transform;
+                gl.uniform_matrix_4fv(prog.loc("right_projection"), false, matrix_to_uniform(&right_projection));
+                gl.uniform_matrix_4fv(prog.loc("right_view"), false, matrix_to_uniform(&right_eye_view));
+            } else {
+                gl.uniform_matrix_4fv(prog.loc("projection"), false, matrix_to_uniform(&projection));
+                gl.uniform_matrix_4fv(prog.loc("view"), false, matrix_to_uniform(&eye_view));
+            }
+
             gl.viewport(viewport.0, viewport.1, viewport.2, viewport.3);
             gl.scissor(viewport.0, viewport.1, viewport.2, viewport.3);
 
@@ -585,8 +641,12 @@ pub fn main() {
                 gl.uniform_matrix_4fv(prog.loc("model"), false, matrix_to_uniform(&mesh.transform));
                 mesh.draw(gl);
             }
-        }
 
+            if multiview {
+                // Multiview requires a single render pass for both eyes
+                break;
+            }
+        }
        
         if !direct_draw {
             gl.flush();

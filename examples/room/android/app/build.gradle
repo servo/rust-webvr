@@ -119,8 +119,6 @@ task appStart(type: Exec, dependsOn: 'installArmRelease') {
 }
 
 dependencies {
-    daydreamCompile 'com.google.vr:sdk-base:1.30.0'
-    daydreamCompile 'com.google.vr:sdk-audio:1.30.0'
     daydreamCompile project(':GVRService')
     gearvrCompile project(':OVRService')
 }

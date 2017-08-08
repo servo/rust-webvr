@@ -32,6 +32,6 @@ android {
     }
 
     dependencies {
-        provided 'com.google.vr:sdk-base:1.30.0'
+        compile 'com.google.vr:sdk-base:1.70.0'
     }
 }

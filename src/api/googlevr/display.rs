@@ -1,5 +1,5 @@
 #![cfg(feature = "googlevr")]
-use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VRFramebuffer,
+use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VRFramebuffer, VRFramebufferAttributes,
     VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer, VRViewport};
 use super::service::GoogleVRService;
 use super::super::utils;
@@ -7,6 +7,7 @@ use super::super::utils;
 use super::jni_utils::JNIScope;
 use gl;
 use gvr_sys as gvr;
+use gvr_sys::gvr_feature::*;
 use gvr_sys::gvr_color_format_type::*;
 use gvr_sys::gvr_depth_stencil_format_type::*;
 use std::ffi::CStr;
@@ -41,7 +42,7 @@ pub struct GoogleVRDisplay {
     new_events_hint: bool,
     pending_events: Mutex<Vec<VREvent>>,
     processed_events: Mutex<Vec<VREvent>>,
-    use_multiview: bool,
+    attributes: VRFramebufferAttributes,
 }
 
 unsafe impl Send for GoogleVRDisplay {}
@@ -108,8 +109,7 @@ impl VRDisplay for GoogleVRDisplay {
     fn sync_poses(&mut self) {
         self.handle_events();
         if !self.presenting {
-            let multiview = self.use_multiview;
-            self.start_present(multiview);
+            self.start_present(None);
         }
 
         unsafe {
@@ -119,7 +119,7 @@ impl VRDisplay for GoogleVRDisplay {
                 gvr::gvr_frame_submit(mem::transmute(&self.frame), self.viewport_list, self.synced_head_matrix);
             }
 
-            gvr::gvr_get_recommended_buffer_viewports(self.ctx, self.viewport_list);
+            self.update_recommended_buffer_viewports();
             // Handle resize
             let size = self.recommended_render_size();
             if size.width != self.render_size.width || size.height != self.render_size.height {
@@ -136,7 +136,7 @@ impl VRDisplay for GoogleVRDisplay {
         self.synced_head_matrix = self.fetch_head_matrix(&time);
     }
 
-    fn bind_framebuffer(&mut self, _eye_index: u32) {
+    fn bind_framebuffer(&mut self, eye_index: u32) {
         // No op
         if self.frame.is_null() {
             warn!("null frame with context");
@@ -144,19 +144,31 @@ impl VRDisplay for GoogleVRDisplay {
         }
 
         unsafe {
+            if eye_index == 1 {
+                // Required to avoid some warnings from the GVR SDK.
+                // It doesn't like binding the same framebuffer multiple times.
+                gvr::gvr_frame_unbind(self.frame);
+            }
             gvr::gvr_frame_bind_buffer(self.frame, 0);
         }
     }
 
     fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
-        vec![VRFramebuffer {
-                multiview: false,
-                viewport: VRViewport::new(0, 0, self.render_size.width/2, self.render_size.height)
-            },
-            VRFramebuffer {
-                multiview: false,
-                viewport: VRViewport::new(self.render_size.width/2, 0, self.render_size.width/2, self.render_size.height)
-            }]
+        if self.attributes.multiview {
+            vec![VRFramebuffer {
+                    attributes: self.attributes,
+                    viewport: VRViewport::new(0, 0, self.render_size.width / 2, self.render_size.height)
+                }]
+        } else {
+            vec![VRFramebuffer {
+                    attributes: self.attributes,
+                    viewport: VRViewport::new(0, 0, self.render_size.width / 2, self.render_size.height)
+                },
+                VRFramebuffer {
+                    attributes: self.attributes,
+                    viewport: VRViewport::new(self.render_size.width / 2, 0, self.render_size.width/2, self.render_size.height)
+                }]
+        }
     }
 
     fn render_layer(&mut self, layer: &VRLayer) {
@@ -187,7 +199,6 @@ impl VRDisplay for GoogleVRDisplay {
             gl::BlitFramebuffer(0, 0, texture_size.0 as i32, texture_size.1 as i32,
                                 0, 0, self.render_size.width, self.render_size.height,
                                 gl::COLOR_BUFFER_BIT, gl::LINEAR);
-            gvr::gvr_frame_unbind(self.frame);
             // Restore bound fbo
             gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
 
@@ -204,15 +215,19 @@ impl VRDisplay for GoogleVRDisplay {
         }
 
         unsafe {
+            gvr::gvr_frame_unbind(self.frame);
             // submit frame
             gvr::gvr_frame_submit(mem::transmute(&self.frame), self.viewport_list, self.synced_head_matrix);
         }
     }
 
     #[cfg(target_os = "android")]
-    fn start_present(&mut self, use_multiview: bool) {
+    fn start_present(&mut self, attributes: Option<VRFramebufferAttributes>) {
         if self.presenting {
             return;
+        }
+        if let Some(attributes) = attributes {
+            self.attributes = attributes;
         }
         self.presenting = true;
         unsafe {
@@ -233,9 +248,12 @@ impl VRDisplay for GoogleVRDisplay {
     }
 
     #[cfg(not(target_os = "android"))]
-    fn start_present(&mut self) {
+    fn start_present(&mut self, attributes: Option<VRFramebufferAttributes>) {
         if self.presenting {
             return;
+        }
+        if let Some(attributes) = attributes {
+            self.attributes = attributes;
         }
         self.presenting = true;
         if self.swap_chain.is_null() {
@@ -309,7 +327,7 @@ impl GoogleVRDisplay {
             new_events_hint: false,
             pending_events: Mutex::new(Vec::new()),
             processed_events: Mutex::new(Vec::new()),
-            use_multiview: false,
+            attributes: Default::default(),
         }))
     }
 
@@ -319,18 +337,46 @@ impl GoogleVRDisplay {
         // Initializes gvr necessary GL-related objects.
         gvr::gvr_initialize_gl(self.ctx);
 
-        // Create a framebuffer required to used to attach and
+        // GVR_FEATURE_MULTIVIEW must be checked after gvr_initialize_gl is called or the function will crash. 
+        if self.attributes.multiview && !gvr::gvr_is_feature_supported(self.ctx, GVR_FEATURE_MULTIVIEW as i32) {
+            self.attributes.multiview = false;
+            warn!("Multiview not supported. Fallback to standar framebuffer.")
+        }
+
+        // Create a framebuffer required to attach and
         // blit the external texture into the main gvr pixel buffer.
         gl::GenFramebuffers(1, &mut self.fbo_id);
 
         // Initialize gvr swap chain
         let spec = gvr::gvr_buffer_spec_create(self.ctx);
         self.render_size = self.recommended_render_size();
-        gvr::gvr_buffer_spec_set_size(spec, self.render_size);
-        // Don't enable 2X MSAA because we only use texture rendering
-        gvr::gvr_buffer_spec_set_samples(spec, 0); 
+
+        if self.attributes.multiview {
+            // Multiview requires half size because the buffer is a texture array with 2 half width layers.
+            gvr::gvr_buffer_spec_set_multiview_layers(spec, 2);
+            gvr::gvr_buffer_spec_set_size(spec, gvr::gvr_sizei {
+                width: self.render_size.width / 2,
+                height: self.render_size.height
+            });
+        } else {
+            gvr::gvr_buffer_spec_set_size(spec, self.render_size);
+        }
+
+        if self.attributes.multisampling {
+            gvr::gvr_buffer_spec_set_samples(spec, 2);
+        } else {
+            gvr::gvr_buffer_spec_set_samples(spec, 0);
+        }
         gvr::gvr_buffer_spec_set_color_format(spec, GVR_COLOR_FORMAT_RGBA_8888 as i32);
-        gvr::gvr_buffer_spec_set_depth_stencil_format(spec, GVR_DEPTH_STENCIL_FORMAT_NONE as i32);
+
+        if self.attributes.depth {
+            gvr::gvr_buffer_spec_set_depth_stencil_format(spec, GVR_DEPTH_STENCIL_FORMAT_DEPTH_16 as i32);
+        } else {
+            gvr::gvr_buffer_spec_set_depth_stencil_format(spec, GVR_DEPTH_STENCIL_FORMAT_NONE as i32);
+        }
+
+        println!("yepaleee6");
+
         self.swap_chain = gvr::gvr_swap_chain_create(self.ctx, mem::transmute(&spec), 1);
         gvr::gvr_buffer_spec_destroy(mem::transmute(&spec));
     }
@@ -390,9 +436,9 @@ impl GoogleVRDisplay {
                         head_matrix: &gvr::gvr_mat4f,
                         near: f32,
                         far: f32) {
-        unsafe {
-            gvr::gvr_get_recommended_buffer_viewports(self.ctx, self.viewport_list);
-        }
+    
+        self.update_recommended_buffer_viewports();
+
         // Get matrices from gvr.
         let left_eye = unsafe { gvr::gvr_get_eye_from_head_matrix(self.ctx, gvr::gvr_eye::GVR_LEFT_EYE as i32) };
         let right_eye = unsafe { gvr::gvr_get_eye_from_head_matrix(self.ctx, gvr::gvr_eye::GVR_RIGHT_EYE as i32) };
@@ -419,6 +465,27 @@ impl GoogleVRDisplay {
 
         // Timestamp
         out.timestamp = utils::timestamp();
+    }
+
+    fn update_recommended_buffer_viewports(&self) {
+        unsafe {
+            gvr::gvr_get_recommended_buffer_viewports(self.ctx, self.viewport_list);
+            if self.attributes.multiview {
+                // gvr_get_recommended_buffer_viewports function assumes that the client is not 
+                // using multiview to render to multiple layers simultaneously.
+                // The uv and source layers need to be updated for multiview.
+                let fullscreen_uv = gvr_texture_bounds(&[0.0, 0.0, 1.0, 1.0]);
+                // Left eye
+                gvr::gvr_buffer_viewport_set_source_uv(self.left_eye_vp, fullscreen_uv);
+                gvr::gvr_buffer_viewport_set_source_layer(self.left_eye_vp, 0);
+                // Right eye
+                gvr::gvr_buffer_viewport_set_source_uv(self.right_eye_vp, fullscreen_uv);
+                gvr::gvr_buffer_viewport_set_source_layer(self.right_eye_vp, 1);
+                // Update viewport list
+                gvr::gvr_buffer_viewport_list_set_item(self.viewport_list, 0, self.left_eye_vp);
+                gvr::gvr_buffer_viewport_list_set_item(self.viewport_list, 1, self.right_eye_vp);
+            }
+        }
     }
 
     // Warning: this function is called from java Main thread

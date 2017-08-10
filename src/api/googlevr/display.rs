@@ -33,6 +33,7 @@ pub struct GoogleVRDisplay {
     render_size: gvr::gvr_sizei,
     swap_chain: *mut gvr::gvr_swap_chain,
     frame: *mut gvr::gvr_frame,
+    frame_bound: bool,
     synced_head_matrix: gvr::gvr_mat4f,
     fbo_id: u32,
     fbo_texture: u32,
@@ -136,7 +137,7 @@ impl VRDisplay for GoogleVRDisplay {
         self.synced_head_matrix = self.fetch_head_matrix(&time);
     }
 
-    fn bind_framebuffer(&mut self, eye_index: u32) {
+    fn bind_framebuffer(&mut self, _eye_index: u32) {
         // No op
         if self.frame.is_null() {
             warn!("null frame with context");
@@ -144,12 +145,13 @@ impl VRDisplay for GoogleVRDisplay {
         }
 
         unsafe {
-            if eye_index == 1 {
+            if self.frame_bound {
                 // Required to avoid some warnings from the GVR SDK.
                 // It doesn't like binding the same framebuffer multiple times.
                 gvr::gvr_frame_unbind(self.frame);
             }
             gvr::gvr_frame_bind_buffer(self.frame, 0);
+            self.frame_bound = true;
         }
     }
 
@@ -172,6 +174,10 @@ impl VRDisplay for GoogleVRDisplay {
     }
 
     fn render_layer(&mut self, layer: &VRLayer) {
+        if self.frame.is_null() {
+            warn!("null frame when calling render_layer");
+            return;
+        }
         debug_assert!(self.fbo_id > 0);
 
         unsafe {
@@ -199,6 +205,8 @@ impl VRDisplay for GoogleVRDisplay {
             gl::BlitFramebuffer(0, 0, texture_size.0 as i32, texture_size.1 as i32,
                                 0, 0, self.render_size.width, self.render_size.height,
                                 gl::COLOR_BUFFER_BIT, gl::LINEAR);
+            gvr::gvr_frame_unbind(self.frame);
+            self.frame_bound = false;
             // Restore bound fbo
             gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
 
@@ -215,7 +223,10 @@ impl VRDisplay for GoogleVRDisplay {
         }
 
         unsafe {
-            gvr::gvr_frame_unbind(self.frame);
+            if self.frame_bound {
+                gvr::gvr_frame_unbind(self.frame);
+                self.frame_bound = false;
+            }
             // submit frame
             gvr::gvr_frame_submit(mem::transmute(&self.frame), self.viewport_list, self.synced_head_matrix);
         }
@@ -318,6 +329,7 @@ impl GoogleVRDisplay {
             },
             swap_chain: ptr::null_mut(),
             frame: ptr::null_mut(),
+            frame_bound: false,
             synced_head_matrix: gvr_identity_matrix(),
             fbo_id: 0,
             fbo_texture: 0,

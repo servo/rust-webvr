@@ -6,6 +6,7 @@ use gvr_sys::gvr_controller_api_status::*;
 use gvr_sys::gvr_controller_button::*;
 use gvr_sys::gvr_controller_connection_state::*;
 use gvr_sys::gvr_controller_handedness::*;
+use gvr_sys::gvr_arm_model_behavior::*;
 use std::cell::RefCell;
 use std::mem;
 use std::ffi::CStr;
@@ -106,7 +107,7 @@ impl VRGamepad for GoogleVRGamepad {
 
         VRGamepadData {
             display_id: self.display_id,
-            name: "GoogleVR DayDream".into(),
+            name: "Daydream Controller".into(),
             hand: hand
         }
     }
@@ -116,6 +117,14 @@ impl VRGamepad for GoogleVRGamepad {
 
         out.gamepad_id = self.gamepad_id;
         unsafe {
+            // Arm Model
+            //let rotation = gvr::gvr_get_head_space_from_start_space_rotation(self.ctx, gvr::gvr_get_time_point_now());
+            //gvr::gvr_controller_apply_arm_model(self.controller_ctx,
+            //                                    GVR_CONTROLLER_RIGHT_HANDED as i32,
+            //                                    GVR_ARM_MODEL_SYNC_GAZE as i32,
+            //                                    rotation);
+
+            // Get status and pose
             gvr::gvr_controller_state_update(self.controller_ctx, 0, self.state);
             let connection_state = gvr::gvr_controller_state_get_connection_state(self.state);
             out.connected = connection_state == GVR_CONTROLLER_CONNECTED as i32;
@@ -155,6 +164,11 @@ impl VRGamepad for GoogleVRGamepad {
             out.pose.orientation = Some([
                 quat.qx, quat.qy, quat.qz, quat.qw
             ]);
+
+            /*let pos = gvr::gvr_controller_state_get_position(self.state);
+            out.pose.position = Some([
+                pos.x, pos.y, pos.z
+            ]);*/
 
             let acc = gvr::gvr_controller_state_get_accel(self.state);
             out.pose.linear_acceleration = Some([

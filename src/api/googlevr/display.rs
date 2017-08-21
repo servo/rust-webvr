@@ -390,8 +390,6 @@ impl GoogleVRDisplay {
             gvr::gvr_buffer_spec_set_depth_stencil_format(spec, GVR_DEPTH_STENCIL_FORMAT_NONE as i32);
         }
 
-        println!("yepaleee6");
-
         self.swap_chain = gvr::gvr_swap_chain_create(self.ctx, mem::transmute(&spec), 1);
         gvr::gvr_buffer_spec_destroy(mem::transmute(&spec));
     }
@@ -412,7 +410,7 @@ impl GoogleVRDisplay {
         out.field_of_view.left_degrees = eye_fov.left as f64;
 
         let eye_mat = gvr::gvr_get_eye_from_head_matrix(self.ctx, eye as i32);
-        out.offset = [eye_mat.m[0][3], eye_mat.m[1][3], eye_mat.m[2][3]];
+        out.offset = [-eye_mat.m[0][3], -eye_mat.m[1][3], -eye_mat.m[2][3]];
     }
 
     fn recommended_render_size(&self) -> gvr::gvr_sizei {
@@ -448,7 +446,7 @@ impl GoogleVRDisplay {
 
     fn fetch_frame_data(&self,
                         out: &mut VRFrameData,
-                        head_matrix: &gvr::gvr_mat4f,
+                        head_mat: &gvr::gvr_mat4f,
                         near: f32,
                         far: f32) {
     
@@ -459,7 +457,7 @@ impl GoogleVRDisplay {
         let right_eye = unsafe { gvr::gvr_get_eye_from_head_matrix(self.ctx, gvr::gvr_eye::GVR_RIGHT_EYE as i32) };
 
         // Convert gvr matrices to rust slices.
-        let head_matrix = gvr_mat4_to_array(&head_matrix);
+        let head_matrix = gvr_mat4_to_array(&head_mat);
         let mut view_matrix:[f32; 16] = unsafe { mem::uninitialized() };
         utils::inverse_matrix(&head_matrix, &mut view_matrix);
 
@@ -476,7 +474,8 @@ impl GoogleVRDisplay {
         out.left_projection_matrix = fov_to_projection_matrix(&left_fov, near, far);
         out.right_projection_matrix = fov_to_projection_matrix(&right_fov, near, far);
 
-        out.pose.orientation = Some(utils::matrix_to_quat(&head_matrix));
+        out.pose.orientation = Some(utils::matrix_to_quat(&view_matrix));
+        out.pose.position = Some([view_matrix[12], view_matrix[13], view_matrix[14]]);
 
         // Timestamp
         out.timestamp = utils::timestamp();
@@ -636,6 +635,47 @@ fn frustum_matrix(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: 
      0.0, y, 0.0, 0.0,
      a, b, c, -1.0,
      0.0, 0.0, d, 0.0]
+}
+
+fn head_matrix_to_quaternion(matrix: &[f32; 16]) -> [f32; 4] {
+    let m: &[f32; 16usize] = unsafe { mem::transmute(matrix) };
+    let t = m[0] + m[5] + m[10];
+    let x;
+    let y;
+    let z;
+    let w;
+    let mut s;
+    if t >= 0.0 {
+        s = (t + 1.0).sqrt();
+        w = 0.5 * s;
+        s = 0.5 / s;
+        x = (m[9] - m[6]) * s;
+        y = (m[2] - m[8]) * s;
+        z = (m[4] - m[1]) * s;
+    } else if m[0] > m[5] && m[0] > m[10] {
+        s = (1.0 + m[0] - m[5] - m[10]).sqrt();
+        x = s * 0.5;
+        s = 0.5 / s;
+        y = (m[4] + m[1]) * s;
+        z = (m[2] + m[8]) * s;
+        w = (m[9] - m[6]) * s;
+    } else if m[5] > m[10] {
+        s = (1.0 + m[5] - m[0] - m[10]).sqrt();
+        y = s * 0.5;
+        s = 0.5 / s;
+        x = (m[4] + m[1]) * s;
+        z = (m[9] + m[6]) * s;
+        w = (m[2] - m[8]) * s;
+    } else {
+        s = (1.0 + m[10] - m[0] - m[5]).sqrt();
+        z = s * 0.5;
+        s = 0.5 / s;
+        x = (m[2] + m[8]) * s;
+        y = (m[9] + m[6]) * s;
+        w = (m[4] - m[1]) * s;
+    }
+
+    [x, y, z, w]
 }
 
 #[inline]

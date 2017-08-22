@@ -158,15 +158,18 @@ impl VRDisplay for GoogleVRDisplay {
     fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
         if self.attributes.multiview {
             vec![VRFramebuffer {
+                    id: 0,
                     attributes: self.attributes,
                     viewport: VRViewport::new(0, 0, self.render_size.width / 2, self.render_size.height)
                 }]
         } else {
             vec![VRFramebuffer {
+                    id: 0,
                     attributes: self.attributes,
                     viewport: VRViewport::new(0, 0, self.render_size.width / 2, self.render_size.height)
                 },
                 VRFramebuffer {
+                    id: 1,
                     attributes: self.attributes,
                     viewport: VRViewport::new(self.render_size.width / 2, 0, self.render_size.width/2, self.render_size.height)
                 }]

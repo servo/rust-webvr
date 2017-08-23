@@ -13,7 +13,7 @@ use std::mem;
 use std::path::Path;
 use std::{thread, time};
 
-use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData};
+use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData, VRFramebufferAttributes};
 
 type Vec3 = Vector3<f32>;
 type Mat4 = Matrix4<f32>;
@@ -49,6 +49,30 @@ const VERTEX_SHADER_MVP: &'static str = r#"
     void main() {
         v_uv = uv;
         gl_Position = projection * view * model * vec4(position, 1.0);
+    }
+"#;
+
+const VERTEX_SHADER_MVP_MULTIVIEW: &'static str = r#"
+	#define VIEW_ID gl_ViewID_OVR
+    #define NUM_VIEWS 2
+
+	#extension GL_OVR_multiview2 : enable
+	layout(num_views=NUM_VIEWS) in;
+
+    in vec3 position;
+    in vec2 uv;
+    out vec2 v_uv;
+
+    uniform mat4 left_projection;
+    uniform mat4 left_view;
+    uniform mat4 right_projection;
+    uniform mat4 right_view;
+    uniform mat4 model;
+
+    void main() {
+        v_uv = uv;
+        mat4 m = VIEW_ID > 0u ? (right_projection * right_view) : (left_projection * left_view);
+        gl_Position = m * model * vec4(position, 1.0);
     }
 "#;
 
@@ -417,6 +441,16 @@ pub fn main() {
     let height = 3.0f32;
     let depth = 5.5f32;
 
+    // We can use data.left_view_matrix or data.pose to render the scene
+    let test_pose = false;
+    // Draw to the HDM frmebuffer directly instead of using a texture
+    let direct_draw = true;
+    let multiview = true;
+
+    if multiview && !direct_draw {
+        panic!("Configuration not supported: Multiview must use direct_draw.");
+    }
+
     let window = glutin::WindowBuilder::new().with_dimensions(window_width, window_height) //.with_vsync()
                                              .with_gl(gl_version())
                                              .build().unwrap();
@@ -446,8 +480,15 @@ pub fn main() {
 
     // texture to be used as a framebuffer
     let target_texture = build_fbo_texture(gl, render_width * 2, render_height);
-    let prog = build_program(gl, VERTEX_SHADER_MVP, FRAGMENT_SHADER,
-                             &["projection", "view", "model", "sampler"], &["position", "uv"]);
+    let prog = if multiview {
+        build_program(gl, VERTEX_SHADER_MVP_MULTIVIEW, FRAGMENT_SHADER,
+                      &["left_projection", "right_projection", "left_view", "right_view", "model", "sampler"],
+                      &["position", "uv"])
+    } else {
+        build_program(gl, VERTEX_SHADER_MVP, FRAGMENT_SHADER,
+                      &["projection", "view", "model", "sampler"],
+                      &["position", "uv"])
+    };
     let prog_fb = build_program(gl, VERTEX_SHADER_FB, FRAGMENT_SHADER2,
                              &["matrix", "sampler"], &["position", "uv"]);
 
@@ -464,17 +505,6 @@ pub fn main() {
 
     let fbo_to_screen = Mesh::new_quad(gl, target_texture);
 
-    let left_viewport = (0i32, 0i32, render_width as i32, render_height as i32);
-    let right_viewport = (render_width as i32, 0i32, render_width as i32, render_height as i32);
-
-    let mut standing_transform = if let Some(ref stage) = display_data.stage_parameters {
-        vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
-    } else {
-        // Stage parameters not available yet or unsupported
-        // Assume 0.75m transform height
-        vec_to_translation(&[0.0, 1.75, 0.0]).inverse_transform().unwrap()
-    };
-
     let framebuffer = gl.gen_framebuffers(1)[0];
     let depth_buffer = gl.gen_renderbuffers(1)[0];
     gl.bind_renderbuffer(gl::RENDERBUFFER, depth_buffer);
@@ -487,10 +517,46 @@ pub fn main() {
     gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
     gl.bind_framebuffer(gl::FRAMEBUFFER, 0);
 
-    let mut event_counter = 0u64;
+    let mut standing_transform = if let Some(ref stage) = display_data.stage_parameters {
+        vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap()
+    } else {
+        // Stage parameters not available yet or unsupported
+        // Assume 0.75m transform height
+        vec_to_translation(&[0.0, 1.75, 0.0]).inverse_transform().unwrap()
+    };
 
-    // We can use data.left_view_matrix or data.pose to render the scene
-    let test_pose = false; 
+    // Configure VR presentation parameters
+    let attributes = VRFramebufferAttributes {
+        multiview: multiview,
+        depth: false,
+        multisampling: false,
+    };
+    display.borrow_mut().start_present(Some(attributes));
+
+    let vr_fbos = display.borrow().get_framebuffers();
+    assert!(vr_fbos.len() > 0);
+
+    if multiview && !vr_fbos.first().unwrap().attributes.multiview {
+        panic!("Multiview not supported in this Device");
+    }
+
+    // Set up viewports for both eyes
+    let left_viewport = if direct_draw { 
+        let fbo = vr_fbos.first().unwrap();
+        (fbo.viewport.x, fbo.viewport.y, fbo.viewport.width, fbo.viewport.height)
+    } else {
+        (0i32, 0i32, render_width as i32, render_height as i32)
+    };
+
+    let right_viewport = if direct_draw {
+        let fbo = vr_fbos.last().unwrap();
+        (fbo.viewport.x, fbo.viewport.y, fbo.viewport.width, fbo.viewport.height)
+    } else {
+        (render_width as i32, 0i32, render_width as i32, render_height as i32)
+    };
+
+
+    let mut event_counter = 0u64;
 
     loop {
         display.borrow_mut().sync_poses();
@@ -500,10 +566,6 @@ pub fn main() {
             // TODO: use event queue instead of checking this every frame
             standing_transform = vec_to_matrix(&stage.sitting_to_standing_transform).inverse_transform().unwrap();
         }
-
-        gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
-        gl.clear_color(1.0, 0.0, 0.0, 1.0);
-        gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
 
         let data: VRFrameData = display.borrow().synced_frame_data(near, far);
 
@@ -531,36 +593,80 @@ pub fn main() {
             (&right_viewport, &data.right_projection_matrix, &right_view_matrix)
         ];
 
+        if !direct_draw {
+            // Render to texture
+            gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
+            gl.clear_color(1.0, 0.0, 0.0, 1.0);
+            gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+        }
+
+        gl.enable(gl::SCISSOR_TEST);
         gl.use_program(prog.id);
         gl.active_texture(gl::TEXTURE0);
         gl.uniform_1i(prog.loc("sampler"), 0);
         gl.enable_vertex_attrib_array(0); // position
         gl.enable_vertex_attrib_array(1); // uv
 
-        for eye in &eyes {
+        for (i, eye) in eyes.iter().enumerate() {
             let viewport = eye.0;
             let projection = vec_to_matrix(eye.1);
             let eye_view = eye.2 * standing_transform;
 
-            gl.uniform_matrix_4fv(prog.loc("projection"), false, matrix_to_uniform(&projection));
-            gl.uniform_matrix_4fv(prog.loc("view"), false, matrix_to_uniform(&eye_view));
+            if direct_draw {
+                // bind the eye framebuffer for direct draw
+                display.borrow_mut().bind_framebuffer(i as u32);
+            }
+
+            if multiview {
+                gl.uniform_matrix_4fv(prog.loc("left_projection"), false, matrix_to_uniform(&projection));
+                gl.uniform_matrix_4fv(prog.loc("left_view"), false, matrix_to_uniform(&eye_view));
+                let right_projection = vec_to_matrix(eyes[1].1);
+                let right_eye_view = eyes[1].2 * standing_transform;
+                gl.uniform_matrix_4fv(prog.loc("right_projection"), false, matrix_to_uniform(&right_projection));
+                gl.uniform_matrix_4fv(prog.loc("right_view"), false, matrix_to_uniform(&right_eye_view));
+            } else {
+                gl.uniform_matrix_4fv(prog.loc("projection"), false, matrix_to_uniform(&projection));
+                gl.uniform_matrix_4fv(prog.loc("view"), false, matrix_to_uniform(&eye_view));
+            }
+
             gl.viewport(viewport.0, viewport.1, viewport.2, viewport.3);
             gl.scissor(viewport.0, viewport.1, viewport.2, viewport.3);
+
+            if direct_draw {
+                gl.clear_color(1.0, 0.0, 0.0, 1.0);
+                gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
+            }
 
             for mesh in &meshes {
                 gl.uniform_matrix_4fv(prog.loc("model"), false, matrix_to_uniform(&mesh.transform));
                 mesh.draw(gl);
             }
-        }
 
-        gl.flush();
+            if multiview {
+                // Multiview requires a single render pass for both eyes
+                break;
+            }
+        }
+       
+        if !direct_draw {
+            gl.flush();
+        }
+        // Disable scissor before submitting the frame to the display.
+        // I found some problems on Gear VR if scissor is enabled when submitting the frame.
+        gl.disable(gl::SCISSOR_TEST);
 
         // Render to HMD
         let layer = VRLayer {
             texture_id: target_texture,
             .. Default::default()
         };
-        display.borrow_mut().submit_frame(&layer);
+
+        if direct_draw {
+            display.borrow_mut().submit_frame();
+        } else {
+            display.borrow_mut().render_layer(&layer);
+            display.borrow_mut().submit_frame();
+        }
 
         // render to desktop display
         gl.bind_framebuffer(gl::FRAMEBUFFER, screen_fbo);
@@ -589,11 +695,13 @@ pub fn main() {
         }
 
         // debug controllers
-        let gamepads = vr.get_gamepads();
-        for gamepad in gamepads {
-            let gamepad = gamepad.borrow();
-            println!("Gamepad Data: {:?}", gamepad.data());
-            println!("Gamepad State: {:?}", gamepad.state());
+        if cfg!(debug) {
+            let gamepads = vr.get_gamepads();
+            for gamepad in gamepads {
+                let gamepad = gamepad.borrow();
+                println!("Gamepad Data: {:?}", gamepad.data());
+                println!("Gamepad State: {:?}", gamepad.state());
+            }
         }
 
         // We don't need to poll VR headset events every frame

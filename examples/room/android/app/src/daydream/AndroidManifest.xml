@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- BEGIN_INCLUDE(manifest) -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="preferExternal"
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="auto"
         package="com.rust.webvr">
 
     <uses-feature android:glEsVersion="0x00020000" android:required="true" />

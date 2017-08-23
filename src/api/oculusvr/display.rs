@@ -2,16 +2,18 @@
 #![cfg(feature = "oculusvr")]
 
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREvent, VRDisplayEvent, 
-    VREyeParameters, VRFrameData, VRLayer};
+    VREyeParameters, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRLayer, VRViewport};
 use android_injected_glue::ffi as ndk;
 use gl;
 use ovr_mobile_sys as ovr;
 use ovr_mobile_sys::ovrFrameLayerEye::*;
 use ovr_mobile_sys::ovrSystemProperty::*;
 use std::cell::{Cell, RefCell};
+use std::ffi::CStr;
 use std::mem;
-use std::os::raw::c_void;
+use std::os::raw::{c_char, c_void};
 use std::ptr;
+use std::str;
 use std::sync::{Arc, Condvar, Mutex};
 use super::gamepad::{OculusVRGamepad, OculusVRGamepadPtr};
 use super::jni_utils::JNIScope;
@@ -23,6 +25,7 @@ pub type OculusVRDisplayPtr = Arc<RefCell<OculusVRDisplay>>;
 extern {
     fn eglGetCurrentContext() -> *mut c_void;
     fn eglGetCurrentDisplay() -> *mut c_void;
+    fn eglGetProcAddress(proc_name: *const c_char) -> *mut c_void;
     fn ANativeWindow_fromSurface(env: *mut c_void, surface: *mut c_void) -> *mut c_void;
 }
 
@@ -57,6 +60,7 @@ pub struct OculusVRDisplay {
     leave_vr_condition: (Mutex<bool>, Condvar),
     // Gamepads linked to this display
     gamepads: Vec<OculusVRGamepadPtr>,
+    attributes: VRFramebufferAttributes,
 }
 
 unsafe impl Send for OculusVRDisplay {}
@@ -125,13 +129,9 @@ impl VRDisplay for OculusVRDisplay {
         }
 
         if !self.is_in_vr_mode() {
-            self.start_present();
+            self.start_present(None);
         }
 
-        if self.eye_framebuffers.is_empty() {
-            self.create_swap_chains();
-            debug_assert!(!self.eye_framebuffers.is_empty());
-        }
         self.frame_index += 1;
         self.predicted_display_time =  unsafe { ovr::vrapi_GetPredictedDisplayTime(self.ovr, self.frame_index) };
         self.predicted_tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, self.predicted_display_time) };
@@ -145,16 +145,30 @@ impl VRDisplay for OculusVRDisplay {
         }
     }
 
-    fn submit_frame(&mut self, layer: &VRLayer) {
+    fn bind_framebuffer(&mut self, eye_index: u32) {
         if self.activity_paused || !self.is_in_vr_mode() {
             return;
         }
+        let eye = &self.eye_framebuffers[eye_index as usize];
+        let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
+        unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, eye.fbos[swap_chain_index as usize]);
+        }
+    }
 
-        let mut frame_params = ovr::helpers::vrapi_DefaultFrameParms(self.render_ovr_java.handle(),
-                                                                     ovr::ovrFrameInit::VRAPI_FRAME_INIT_DEFAULT,
-                                                                     self.predicted_display_time,
-                                                                     ptr::null_mut());
-        frame_params.FrameIndex = self.frame_index;
+    fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
+        self.eye_framebuffers.iter().map(|fbo| {
+            VRFramebuffer {
+                attributes: fbo.attributes,
+                viewport: VRViewport::new(0, 0, fbo.width as i32, fbo.height as i32)
+            }
+        }).collect()
+    }
+
+    fn render_layer(&mut self, layer: &VRLayer) {
+        if self.activity_paused || !self.is_in_vr_mode() {
+            return;
+        }
 
         // Save current fbo to restore it when the frame is submitted.
         let mut current_fbo = 0;
@@ -162,7 +176,6 @@ impl VRDisplay for OculusVRDisplay {
             gl::GetIntegerv(gl::FRAMEBUFFER_BINDING, &mut current_fbo);
         }
 
-        let eye_projection = self.eye_projection.get();
         for (i, eye) in self.eye_framebuffers.iter_mut().enumerate() {
             let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
 
@@ -193,23 +206,56 @@ impl VRDisplay for OculusVRDisplay {
                                     0, 0, eye.width as i32, eye.height as i32,
                                     gl::COLOR_BUFFER_BIT, gl::LINEAR);
             }
+        }
+
+        // Restore bound fbo
+        unsafe {
+            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
+        }
+    }
+
+    fn submit_frame(&mut self) {
+        if self.activity_paused || !self.is_in_vr_mode() {
+            return;
+        }
+
+        // Set up frame params
+        let mut frame_params = ovr::helpers::vrapi_DefaultFrameParms(self.render_ovr_java.handle(),
+                                                                     ovr::ovrFrameInit::VRAPI_FRAME_INIT_DEFAULT,
+                                                                     self.predicted_display_time,
+                                                                     ptr::null_mut());
+        frame_params.FrameIndex = self.frame_index;
+
+        let eye_projection = self.eye_projection.get();
+        let tex_coords = ovr::helpers::ovrMatrix4f_TanAngleMatrixFromProjection(&eye_projection);
+
+        for i in 0..VRAPI_FRAME_LAYER_EYE_MAX as usize {
+            let eye = if self.eye_framebuffers.len() > 1 {
+                &self.eye_framebuffers[i]
+            } else {
+                &self.eye_framebuffers[0]
+            };
+            
+            let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
 
             let target = &mut frame_params.Layers[0].Textures[i];
             target.ColorTextureSwapChain = eye.swap_chain;
             target.TextureSwapChainIndex = swap_chain_index;
-            target.TexCoordsFromTanAngles = ovr::helpers::ovrMatrix4f_TanAngleMatrixFromProjection(&eye_projection);
+            target.TexCoordsFromTanAngles = tex_coords;
             target.HeadPose = self.predicted_tracking.HeadPose;
             //frame_params.Layers[0].Textures[eye].CompletionFence = fence;
         }
 
         unsafe {
             ovr::vrapi_SubmitFrame(self.ovr, &frame_params);
-            // Restore bound fbo
-            gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
         }
     }
 
-    fn start_present(&mut self) {
+    fn start_present(&mut self, attributes: Option<VRFramebufferAttributes>) {
+        if let Some(attributes) = attributes {
+            // Overwrite current attributes
+            self.attributes = attributes;
+        }
         if self.presenting == false {
             // Show the SurfaceView on top of the Android view Hierarchy
             unsafe {
@@ -225,6 +271,12 @@ impl VRDisplay for OculusVRDisplay {
             error!("Failed to attach to JavaThread {}", error);
             return;
         }
+
+        if self.eye_framebuffers.is_empty() {
+            self.create_swap_chains();
+            debug_assert!(!self.eye_framebuffers.is_empty());
+        }
+
         self.presenting = true;
         self.enter_vr_mode();
     }
@@ -271,6 +323,7 @@ impl OculusVRDisplay {
             pending_action: Mutex::new(None),
             leave_vr_condition: (Mutex::new(false), Condvar::new()),
             gamepads: Vec::new(),
+            attributes: Default::default(),
         }))
     }
 
@@ -336,6 +389,15 @@ impl OculusVRDisplay {
         }
     }
 
+    fn is_multiview_supported(&self) -> bool {
+        unsafe {
+            let extensions = gl::GetString(gl::EXTENSIONS);
+            let extensions = str::from_utf8_unchecked(CStr::from_ptr(extensions as *const c_char).to_bytes()).to_string();
+            extensions.contains("GL_OVR_multiview") && 
+                       ovr::vrapi_GetSystemPropertyInt(&self.render_ovr_java.java, VRAPI_SYS_PROP_MULTIVIEW_AVAILABLE) != 0
+        }
+    }
+
     fn create_swap_chains(&mut self) {
         self.eye_framebuffers.clear();
 
@@ -357,9 +419,15 @@ impl OculusVRDisplay {
             gl::GetIntegerv(gl::TEXTURE_BINDING_2D, &mut current_texture);
         }
 
-        for _ in 0..2 {
+        if self.attributes.multiview && !self.is_multiview_supported(){
+            // Ensure that multiview is really supported
+            self.attributes.multiview = false;
+        }
+
+        let num_buffers = if self.attributes.multiview { 1 }  else { VRAPI_FRAME_LAYER_EYE_MAX as u32 }; 
+        for _ in 0..num_buffers {
             let eye_framebuffer = unsafe {
-                OculusEyeFramebuffer::new(recommended_eye_size.0, recommended_eye_size.1)
+                OculusEyeFramebuffer::new(recommended_eye_size.0, recommended_eye_size.1, &self.attributes)
             };
             self.eye_framebuffers.push(eye_framebuffer);
         }
@@ -571,14 +639,22 @@ impl OculusVRDisplay {
 struct OculusEyeFramebuffer {
     swap_chain: *mut ovr::ovrTextureSwapChain,
     swap_chain_length: i32,
-    fbos: Vec<u32>, // Multiple FBOs for triple buffering
+    fbos: Vec<u32>, // Multiple FBOs for triple buffering,
+    depth_buffers: Vec<u32>,
     width: u32,
-    height: u32
+    height: u32,
+    attributes: VRFramebufferAttributes,
 }
 
 impl OculusEyeFramebuffer {
-    pub unsafe fn new(width: u32, height: u32) -> OculusEyeFramebuffer {
-        let swap_chain = ovr::vrapi_CreateTextureSwapChain(ovr::ovrTextureType::VRAPI_TEXTURE_TYPE_2D,
+    pub unsafe fn new(width: u32, height: u32, attributes: &VRFramebufferAttributes) -> OculusEyeFramebuffer {
+        let (texture_type, texture_target) = if attributes.multiview {
+            (ovr::ovrTextureType::VRAPI_TEXTURE_TYPE_2D_ARRAY, gl::TEXTURE_2D_ARRAY)
+        } else {
+            (ovr::ovrTextureType::VRAPI_TEXTURE_TYPE_2D, gl::TEXTURE_2D)
+        };
+
+        let swap_chain = ovr::vrapi_CreateTextureSwapChain(texture_type,
                                                            ovr::ovrTextureFormat::VRAPI_TEXTURE_FORMAT_8888,
                                                            width as i32,
                                                            height as i32,
@@ -586,33 +662,65 @@ impl OculusEyeFramebuffer {
                                                            true);
         let swap_chain_length = ovr::vrapi_GetTextureSwapChainLength(swap_chain);
         let mut fbos = Vec::new();
+        let mut depth_buffers = Vec::new();
         for index in 0..swap_chain_length {
             // Initialize the color buffer texture.
             let texture = ovr::vrapi_GetTextureSwapChainHandle(swap_chain, index);
-            gl::BindTexture(gl::TEXTURE_2D, texture);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+            gl::BindTexture(texture_target, texture);
+            gl::TexParameteri(texture_target, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
+            gl::TexParameteri(texture_target, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
+            gl::TexParameteri(texture_target, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
+            gl::TexParameteri(texture_target, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
+
 
             // Set up the FBO to render to the texture.
+            // Optional depth based on attributes.
             let mut fbo = 0;
+            let mut depth = 0;
+
             gl::GenFramebuffers(1, &mut fbo);
-            gl::BindFramebuffer(gl::FRAMEBUFFER, fbo);
-            gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, texture, 0);
+
+            if attributes.multiview {
+                gl::BindFramebuffer(gl::DRAW_FRAMEBUFFER, fbo);
+                gl::FramebufferTextureMultiviewOVR(gl::DRAW_FRAMEBUFFER, gl::COLOR_ATTACHMENT0, texture, 0, 0, 2);
+                if attributes.depth {
+                    gl::GenTextures(1, &mut depth);
+                    gl::BindTexture(gl::TEXTURE_2D_ARRAY, depth);
+                    gl::TexStorage3D(gl::TEXTURE_2D_ARRAY, 1, gl::DEPTH_COMPONENT24, width as i32, height as i32, 2);
+                    gl::BindTexture(gl::TEXTURE_2D_ARRAY, 0);
+                    gl::FramebufferTextureMultiviewOVR(gl::DRAW_FRAMEBUFFER, gl::DEPTH_ATTACHMENT, texture, 0, 0, 2);
+                }
+
+            } else {
+                gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, texture, 0);
+                if attributes.depth {
+                    gl::GenRenderbuffers(1, &mut depth);
+                    gl::BindRenderbuffer(gl::RENDERBUFFER, depth);
+                    gl::RenderbufferStorage(gl::RENDERBUFFER, gl::DEPTH_COMPONENT24, width as i32, height as i32);
+                    gl::BindRenderbuffer(gl::RENDERBUFFER, 0);
+                    gl::FramebufferTextureMultiviewOVR(gl::FRAMEBUFFER, gl::DEPTH_ATTACHMENT, texture, 0, 0, 2);
+                }
+            }
+
             let status = gl::CheckFramebufferStatus(gl::FRAMEBUFFER);
             if status != gl::FRAMEBUFFER_COMPLETE {
                 panic!("Oculus VR Incomplete Framebuffer: {}", status);
+            }
+
+            if depth > 0 {
+                depth_buffers.push(depth);
             }
             fbos.push(fbo);
         }
 
         OculusEyeFramebuffer {
-            swap_chain: swap_chain,
-            swap_chain_length: swap_chain_length,
-            fbos: fbos,
-            width: width,
-            height: height,
+            swap_chain,
+            swap_chain_length,
+            fbos,
+            depth_buffers,
+            width,
+            height,
+            attributes: *attributes,
         }
     }
 }
@@ -622,6 +730,13 @@ impl Drop for OculusEyeFramebuffer {
         unsafe {
             for fbo in &self.fbos {
                 gl::DeleteFramebuffers(1, mem::transmute(fbo));
+            }
+            for depth_buffer in &self.depth_buffers {
+                if self.attributes.multiview {
+                    gl::DeleteTextures(1, mem::transmute(depth_buffer));
+                } else {
+                    gl::DeleteRenderbuffers(1, mem::transmute(depth_buffer));
+                }
             }
             ovr::vrapi_DestroyTextureSwapChain(self.swap_chain);
         }

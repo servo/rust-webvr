@@ -1,4 +1,4 @@
-use {VRDisplayData, VRFrameData, VRLayer};
+use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRLayer};
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
@@ -29,12 +29,24 @@ pub trait VRDisplay: Send + Sync {
     // Must be called in the render thread, before doing any work
     fn sync_poses(&mut self);
 
+    // Binds the framebuffer to directly render to the HDM
+    // Must be called in the render thread, before doing any work
+    fn bind_framebuffer(&mut self, index: u32);
+
+    // Returns the available FBOs that must be used to render to all eyes
+    // Must be called in the render thread, before doing any work
+    fn get_framebuffers(&self) -> Vec<VRFramebuffer>;
+
+    // Renders a VRLayer from a external texture
+    // Must be called in the render thread
+    fn render_layer(&mut self, layer: &VRLayer);
+
     // Submits frame to the display
     // Must be called in the render thread
-    fn submit_frame(&mut self, layer: &VRLayer);
+    fn submit_frame(&mut self);
 
     // Hint to indicate that we are going to start sending frames to the device
-    fn start_present(&mut self) {}
+    fn start_present(&mut self, _attributes: Option<VRFramebufferAttributes>) {}
 
     // Hint to indicate that we are going to stop sending frames to the device
     fn stop_present(&mut self) {}

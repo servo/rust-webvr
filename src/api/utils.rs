@@ -119,9 +119,9 @@ pub fn matrix_to_quat(matrix: &[f32; 16]) -> [f32; 4] {
     let mut y = f32::max(0.0, 1.0 - m[0][0] + m[1][1] - m[2][2]).sqrt() * 0.5;
     let mut z = f32::max(0.0, 1.0 - m[0][0] - m[1][1] + m[2][2]).sqrt() * 0.5;
 
-    x = copysign(x, m[1][2] - m[2][1]);
-    y = copysign(y, m[2][0] - m[0][2]);
-    z = copysign(z, m[0][1] - m[1][0]);
+    x = copysign(x, m[2][1] - m[1][2]);
+    y = copysign(y, m[0][2] - m[2][0]);
+    z = copysign(z, m[1][0] - m[0][1]);
 
     [x, y, z, w]
 }

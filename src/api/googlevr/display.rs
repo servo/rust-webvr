@@ -390,8 +390,6 @@ impl GoogleVRDisplay {
             gvr::gvr_buffer_spec_set_depth_stencil_format(spec, GVR_DEPTH_STENCIL_FORMAT_NONE as i32);
         }
 
-        println!("yepaleee6");
-
         self.swap_chain = gvr::gvr_swap_chain_create(self.ctx, mem::transmute(&spec), 1);
         gvr::gvr_buffer_spec_destroy(mem::transmute(&spec));
     }
@@ -412,7 +410,7 @@ impl GoogleVRDisplay {
         out.field_of_view.left_degrees = eye_fov.left as f64;
 
         let eye_mat = gvr::gvr_get_eye_from_head_matrix(self.ctx, eye as i32);
-        out.offset = [eye_mat.m[0][3], eye_mat.m[1][3], eye_mat.m[2][3]];
+        out.offset = [-eye_mat.m[0][3], -eye_mat.m[1][3], -eye_mat.m[2][3]];
     }
 
     fn recommended_render_size(&self) -> gvr::gvr_sizei {
@@ -448,7 +446,7 @@ impl GoogleVRDisplay {
 
     fn fetch_frame_data(&self,
                         out: &mut VRFrameData,
-                        head_matrix: &gvr::gvr_mat4f,
+                        head_mat: &gvr::gvr_mat4f,
                         near: f32,
                         far: f32) {
     
@@ -459,7 +457,7 @@ impl GoogleVRDisplay {
         let right_eye = unsafe { gvr::gvr_get_eye_from_head_matrix(self.ctx, gvr::gvr_eye::GVR_RIGHT_EYE as i32) };
 
         // Convert gvr matrices to rust slices.
-        let head_matrix = gvr_mat4_to_array(&head_matrix);
+        let head_matrix = gvr_mat4_to_array(&head_mat);
         let mut view_matrix:[f32; 16] = unsafe { mem::uninitialized() };
         utils::inverse_matrix(&head_matrix, &mut view_matrix);
 
@@ -476,7 +474,8 @@ impl GoogleVRDisplay {
         out.left_projection_matrix = fov_to_projection_matrix(&left_fov, near, far);
         out.right_projection_matrix = fov_to_projection_matrix(&right_fov, near, far);
 
-        out.pose.orientation = Some(utils::matrix_to_quat(&head_matrix));
+        out.pose.orientation = Some(utils::matrix_to_quat(&view_matrix));
+        out.pose.position = Some([view_matrix[12], view_matrix[13], view_matrix[14]]);
 
         // Timestamp
         out.timestamp = utils::timestamp();

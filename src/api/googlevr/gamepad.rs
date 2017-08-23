@@ -106,7 +106,7 @@ impl VRGamepad for GoogleVRGamepad {
 
         VRGamepadData {
             display_id: self.display_id,
-            name: "GoogleVR DayDream".into(),
+            name: "Daydream Controller".into(),
             hand: hand
         }
     }

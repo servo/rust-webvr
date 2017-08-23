@@ -577,7 +577,7 @@ pub fn main() {
                 Some(ref position) => vec_to_translation(&position).inverse_transform().unwrap(),
                 None => Matrix4::<f32>::identity()
             };
-            let view = (rotation_transform * position_transform).inverse_transform().unwrap();
+            let view = rotation_transform * position_transform;
             let left_eye_to_head = vec_to_translation(&display_data.left_eye_parameters.offset);
             let right_eye_to_head = vec_to_translation(&display_data.right_eye_parameters.offset);
             ((view * left_eye_to_head).inverse_transform().unwrap(),

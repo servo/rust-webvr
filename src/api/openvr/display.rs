@@ -1,3 +1,5 @@
+use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREyeParameters, VRFrameData};
+use {VRFramebuffer, VRPose, VRStageParameters, VRFieldOfView, VRLayer};
 use super::binding as openvr;
 use super::binding::ETrackedPropertyError::*;
 use super::binding::ETrackedDeviceProperty::*;
@@ -15,8 +17,6 @@ use std::slice;
 use std::str;
 use std::ptr;
 use std::mem;
-use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREyeParameters,
-    VRFrameData, VRPose, VRStageParameters, VRFieldOfView, VRLayer};
 
 pub type OpenVRDisplayPtr = Arc<RefCell<OpenVRDisplay>>;
 
@@ -26,7 +26,10 @@ pub struct OpenVRDisplay {
     index: openvr::TrackedDeviceIndex_t,
     system: *mut openvr::VR_IVRSystem_FnTable,
     chaperone: *mut openvr::VR_IVRChaperone_FnTable,
-    compositor: *mut openvr::VR_IVRCompositor_FnTable
+    compositor: *mut openvr::VR_IVRCompositor_FnTable,
+    frame_texture:  openvr::Texture_t,
+    left_bounds: openvr::VRTextureBounds_t,
+    right_bounds: openvr::VRTextureBounds_t,
 }
 
 unsafe impl Send for OpenVRDisplay {}
@@ -44,7 +47,14 @@ impl OpenVRDisplay {
             index: index,
             system: system,
             chaperone: chaperone,
-            compositor: ptr::null_mut()
+            compositor: ptr::null_mut(),
+            frame_texture: openvr::Texture_t {
+                handle: ptr::null_mut(),
+                eType: EGraphicsAPIConvention_API_OpenGL,
+                eColorSpace: openvr::EColorSpace::EColorSpace_ColorSpace_Auto,
+            },
+            left_bounds: unsafe { mem::zeroed() },
+            right_bounds: unsafe { mem::zeroed() },
         }))
     }
 }
@@ -130,22 +140,30 @@ impl VRDisplay for OpenVRDisplay {
         }
     }
 
-    fn submit_frame(&mut self, layer: &VRLayer) {
+    fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
+        Vec::new()
+    }
+
+    fn bind_framebuffer(&mut self, _eye_index: u32) {
+
+    }
+
+    fn render_layer(&mut self, layer: &VRLayer) {
+        self.frame_texture.handle = unsafe { mem::transmute(layer.texture_id as u64) };
+        self.left_bounds = texture_bounds_to_openvr(&layer.left_bounds);
+        self.right_bounds = texture_bounds_to_openvr(&layer.right_bounds);
+    }
+
+    fn submit_frame(&mut self) {
         if !self.ensure_compositor_ready() {
             return;
         }
-        let mut texture: openvr::Texture_t = unsafe { mem::uninitialized() };
-        texture.handle = unsafe { mem::transmute(layer.texture_id as u64) };
-        texture.eColorSpace = openvr::EColorSpace::EColorSpace_ColorSpace_Auto;
-        texture.eType = EGraphicsAPIConvention_API_OpenGL;
 
-        let mut left_bounds = texture_bounds_to_openvr(&layer.left_bounds);
-        let mut right_bounds = texture_bounds_to_openvr(&layer.right_bounds);
         let flags = openvr::EVRSubmitFlags::EVRSubmitFlags_Submit_Default;
 
         unsafe {
-            (*self.compositor).Submit.unwrap()(EVREye_Eye_Left, &mut texture, &mut left_bounds, flags);
-            (*self.compositor).Submit.unwrap()(EVREye_Eye_Right, &mut texture, &mut right_bounds, flags);
+            (*self.compositor).Submit.unwrap()(EVREye_Eye_Left, &mut self.frame_texture, &mut self.left_bounds, flags);
+            (*self.compositor).Submit.unwrap()(EVREye_Eye_Right, &mut self.frame_texture, &mut self.right_bounds, flags);
             (*self.compositor).PostPresentHandoff.unwrap()();
         }
     }

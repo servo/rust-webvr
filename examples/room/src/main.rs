@@ -444,8 +444,8 @@ pub fn main() {
     // We can use data.left_view_matrix or data.pose to render the scene
     let test_pose = false;
     // Draw to the HDM frmebuffer directly instead of using a texture
-    let direct_draw = true;
-    let multiview = true;
+    let direct_draw = false;
+    let multiview = false;
 
     if multiview && !direct_draw {
         panic!("Configuration not supported: Multiview must use direct_draw.");

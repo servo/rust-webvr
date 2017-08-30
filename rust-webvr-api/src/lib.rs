@@ -9,8 +9,13 @@ pub extern crate android_injected_glue;
 #[cfg(feature = "utils")]
 extern crate time;
 
+#[cfg(feature = "serde-serialization")]
+#[macro_use]
+extern crate serde_derive;
+
 #[cfg(all(feature = "jni_utils", target_os = "android"))]
 pub mod jni_utils;
+
 #[cfg(feature = "utils")]
 pub mod utils;
 

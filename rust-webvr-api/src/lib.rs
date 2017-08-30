@@ -3,30 +3,19 @@ macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);
 }
 
-#[cfg(any(feature = "googlevr", feature= "oculusvr"))]
-#[cfg(target_os = "android")]
-extern crate android_injected_glue;
-#[cfg(feature = "googlevr")]
-extern crate gvr_sys;
-#[cfg(feature = "openvr")]
-extern crate libloading;
-#[macro_use]
-extern crate log;
-#[cfg(feature = "oculusvr")]
-extern crate ovr_mobile_sys;
-#[cfg(feature = "serde-serialization")]
-#[macro_use]
-extern crate serde_derive;
+#[cfg(all(feature = "jni_utils", target_os = "android"))]
+pub extern crate android_injected_glue;
+
+#[cfg(feature = "utils")]
 extern crate time;
 
-#[cfg(any(feature = "googlevr", feature= "oculusvr"))]
-mod gl {
-    include!(concat!(env!("OUT_DIR"), "/gles_bindings.rs"));
-}
+#[cfg(all(feature = "jni_utils", target_os = "android"))]
+pub mod jni_utils;
+#[cfg(feature = "utils")]
+pub mod utils;
 
 pub mod vr_display;
 pub mod vr_service;
-pub mod vr_manager;
 pub mod vr_display_data;
 pub mod vr_display_capabilities;
 pub mod vr_eye;
@@ -42,7 +31,6 @@ pub mod vr_gamepad;
 
 pub use vr_display::{VRDisplay,VRDisplayPtr};
 pub use vr_service::{VRService,VRServiceCreator};
-pub use vr_manager::VRServiceManager;
 pub use vr_display_data::VRDisplayData;
 pub use vr_display_capabilities::VRDisplayCapabilities;
 pub use vr_eye::VREye;
@@ -56,5 +44,3 @@ pub use vr_event::{VREvent, VRDisplayEvent, VRDisplayEventReason, VRGamepadEvent
 pub use vr_field_view::VRFieldOfView;
 pub use vr_gamepad::{VRGamepad, VRGamepadPtr, VRGamepadHand,
                      VRGamepadData, VRGamepadState, VRGamepadButton};
-
-pub mod api;

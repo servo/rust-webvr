@@ -16,16 +16,15 @@ use std::ptr;
 use std::str;
 use std::sync::{Arc, Condvar, Mutex};
 use super::gamepad::{OculusVRGamepad, OculusVRGamepadPtr};
-use super::jni_utils::JNIScope;
+use rust_webvr_api::jni_utils::JNIScope;
 use super::service::{OVRJava, OVRServiceJava};
-use super::super::utils;
+use rust_webvr_api::utils;
 
 pub type OculusVRDisplayPtr = Arc<RefCell<OculusVRDisplay>>;
 
 extern {
     fn eglGetCurrentContext() -> *mut c_void;
     fn eglGetCurrentDisplay() -> *mut c_void;
-    fn eglGetProcAddress(proc_name: *const c_char) -> *mut c_void;
     fn ANativeWindow_fromSurface(env: *mut c_void, surface: *mut c_void) -> *mut c_void;
 }
 
@@ -157,8 +156,9 @@ impl VRDisplay for OculusVRDisplay {
     }
 
     fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
-        self.eye_framebuffers.iter().map(|fbo| {
+        self.eye_framebuffers.iter().enumerate().map(|(index, fbo)| {
             VRFramebuffer {
+                id: index as u32,
                 attributes: fbo.attributes,
                 viewport: VRViewport::new(0, 0, fbo.width as i32, fbo.height as i32)
             }

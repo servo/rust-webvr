@@ -2,9 +2,9 @@
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VRFramebuffer, VRFramebufferAttributes,
     VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer, VRViewport};
 use super::service::GoogleVRService;
-use super::super::utils;
+use rust_webvr_api::utils;
 #[cfg(target_os="android")]
-use super::jni_utils::JNIScope;
+use rust_webvr_api::jni_utils::JNIScope;
 use gl;
 use gvr_sys as gvr;
 use gvr_sys::gvr_feature::*;

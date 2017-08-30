@@ -8,7 +8,7 @@ use ovr_mobile_sys as ovr;
 use std::mem;
 use std::ptr;
 use super::display::{OculusVRDisplay, OculusVRDisplayPtr};
-use super::jni_utils::JNIScope;
+use rust_webvr_api::jni_utils::JNIScope;
 
 const SERVICE_CLASS_NAME:&'static str = "com/rust/webvr/OVRService"; 
 

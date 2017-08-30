@@ -9,7 +9,7 @@ use super::binding::ETrackingUniverseOrigin::*;
 use super::binding::EGraphicsAPIConvention::*;
 use super::library::OpenVRLibrary;
 use super::constants;
-use super::super::utils;
+use rust_webvr_api::utils;
 use std::ffi::CString;
 use std::sync::Arc;
 use std::cell::RefCell;

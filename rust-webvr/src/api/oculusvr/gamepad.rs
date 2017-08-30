@@ -11,7 +11,7 @@ use std::mem;
 use std::ptr;
 use std::sync::Arc;
 use super::display::{ovr_quat_to_array, ovr_vec3_to_array};
-use super::super::utils;
+use rust_webvr_api::utils;
 
 pub type OculusVRGamepadPtr = Arc<RefCell<OculusVRGamepad>>;
 

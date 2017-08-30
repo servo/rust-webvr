@@ -1,6 +1,6 @@
 #![cfg(feature = "googlevr")]
 use {VRGamepad, VRGamepadData, VRGamepadHand, VRGamepadState, VRGamepadButton};
-use super::super::utils;
+use rust_webvr_api::utils;
 use gvr_sys as gvr;
 use gvr_sys::gvr_controller_api_status::*;
 use gvr_sys::gvr_controller_button::*;

@@ -1,5 +1,4 @@
-#![cfg(any(feature = "googlevr", feature= "oculusvr"))]
-#![cfg(target_os = "android")]
+#[cfg(all(feature = "jni_utils", target_os = "android"))]
 
 use android_injected_glue as android;
 use android_injected_glue::ffi as ndk;

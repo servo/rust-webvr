@@ -1,3 +1,5 @@
+#[cfg(feature = "utils")]
+
 use std::mem;
 use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use std::sync::atomic::Ordering::SeqCst;

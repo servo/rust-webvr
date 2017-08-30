@@ -4,7 +4,7 @@ use {VRService, VRDisplay, VRDisplayPtr, VREvent, VRGamepadPtr};
 use super::display::{GoogleVRDisplay, GoogleVRDisplayPtr};
 use super::gamepad::{GoogleVRGamepad, GoogleVRGamepadPtr};
 #[cfg(target_os="android")]
-use super::jni_utils::JNIScope;
+use rust_webvr_api::jni_utils::JNIScope;
 #[cfg(target_os="android")]
 use android_injected_glue::ffi as ndk;
 use gvr_sys as gvr;

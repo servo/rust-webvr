@@ -1,5 +1,5 @@
 use {VRDisplay, VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRStageParameters, VRLayer, VRViewport};
-use super::super::utils;
+use rust_webvr_api::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type MockVRDisplayPtr = Arc<RefCell<MockVRDisplay>>;

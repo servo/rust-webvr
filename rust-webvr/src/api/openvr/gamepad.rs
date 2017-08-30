@@ -3,7 +3,7 @@ use super::binding::ETrackingUniverseOrigin::*;
 use super::binding::EVRButtonId;
 use super::binding::EVRButtonId::*;
 use super::display::OpenVRDisplay;
-use super::super::utils;
+use rust_webvr_api::utils;
 use std::cell::RefCell;
 use std::mem;
 use std::sync::Arc;

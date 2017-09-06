@@ -1,6 +1,6 @@
 rootProject.name = 'RoomScaleDemo'
 include ':app'
 include ':GVRService'
-project(':GVRService').projectDir = new File('../../../src/api/googlevr/gradle')
+project(':GVRService').projectDir = new File('../../../rust-webvr/src/api/googlevr/gradle')
 include ':OVRService'
-project(':OVRService').projectDir = new File('../../../src/api/oculusvr/gradle')
+project(':OVRService').projectDir = new File('../../../rust-webvr/src/api/oculusvr/gradle')

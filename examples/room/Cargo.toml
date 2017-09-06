@@ -10,10 +10,9 @@ gleam = "0.4"
 cgmath = "0.12"
 image = "0.12"
 android_glue = "0.2"
+rust-webvr = { path = "../../rust-webvr" }
+rust-svr = { path = "../../../rust-svr" }
 
 [target.'cfg(target_os = "android")'.dependencies]
 android_injected_glue = {git = "https://github.com/mmatyas/android-rs-injected-glue"}
-
-[dependencies.rust-webvr]
-path = "../.."
 

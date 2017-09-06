@@ -2,4 +2,5 @@
 members = [
     "rust-webvr",
     "rust-webvr-api",
+    "examples/room",
 ]

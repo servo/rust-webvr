@@ -150,8 +150,16 @@ impl VRDisplay for GoogleVRDisplay {
                 // It doesn't like binding the same framebuffer multiple times.
                 gvr::gvr_frame_unbind(self.frame);
             }
+            // gvr_frame_bind_buffer may make the current active texture unit dirty
+            let mut active_unit = 0;
+            gl::GetIntegerv(gl::ACTIVE_TEXTURE, &mut active_unit);
+
+            // Bind daydream FBO
             gvr::gvr_frame_bind_buffer(self.frame, 0);
             self.frame_bound = true;
+
+            // Restore texture unit
+            gl::ActiveTexture(active_unit as u32);
         }
     }
 
@@ -203,7 +211,7 @@ impl VRDisplay for GoogleVRDisplay {
             });
 
             // BlitFramebuffer: external texture to gvr pixel buffer
-            gvr::gvr_frame_bind_buffer(self.frame, 0);
+            self.bind_framebuffer(0);
             gl::BindFramebuffer(gl::READ_FRAMEBUFFER, self.fbo_id);
             gl::BlitFramebuffer(0, 0, texture_size.0 as i32, texture_size.1 as i32,
                                 0, 0, self.render_size.width, self.render_size.height,

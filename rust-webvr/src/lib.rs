@@ -7,9 +7,6 @@ extern crate libloading;
 extern crate log;
 #[cfg(all(feature = "oculusvr", target_os= "android"))]
 extern crate ovr_mobile_sys;
-#[cfg(feature = "serde-serialization")]
-#[macro_use]
-extern crate serde_derive;
 
 #[cfg(any(feature = "googlevr", feature= "oculusvr"))]
 mod gl {

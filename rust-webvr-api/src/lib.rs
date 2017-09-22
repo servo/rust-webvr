@@ -14,6 +14,10 @@ pub mod jni_utils;
 #[cfg(feature = "utils")]
 pub mod utils;
 
+#[cfg(feature = "serde-serialization")]
+#[macro_use]
+extern crate serde_derive;
+
 pub mod vr_display;
 pub mod vr_service;
 pub mod vr_display_data;

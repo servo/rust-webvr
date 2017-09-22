@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr-api"
-version = "0.9.0"
+version = "0.9.1"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"
@@ -13,7 +13,7 @@ and integration with vendor specific SDKs like OpenVR and Oculus. The API is ins
 easy to use WebVR API but adapted to Rust design patterns'''
 
 [features]
-default = ["utils", "jni_utils"]
+default = ["utils", "jni_utils", "serde-serialization"]
 utils = ["time"]
 jni_utils = ["android_injected_glue"]
 serde-serialization = ["serde", "serde_derive"]

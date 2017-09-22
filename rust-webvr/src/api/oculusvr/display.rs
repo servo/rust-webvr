@@ -158,7 +158,7 @@ impl VRDisplay for OculusVRDisplay {
     fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
         self.eye_framebuffers.iter().enumerate().map(|(index, fbo)| {
             VRFramebuffer {
-                id: index as u32,
+                eye_index: index as u32,
                 attributes: fbo.attributes,
                 viewport: VRViewport::new(0, 0, fbo.width as i32, fbo.height as i32)
             }

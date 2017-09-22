@@ -123,12 +123,12 @@ impl VRDisplay for MockVRDisplay {
 
     fn get_framebuffers(&self) -> Vec<VRFramebuffer> {
         vec![VRFramebuffer {
-                id: 0,
+                eye_index: 0,
                 attributes: self.attributes,
                 viewport: VRViewport::new(0, 0, 1512/2, 1680)
             },
             VRFramebuffer {
-                id: 1,
+                eye_index: 1,
                 attributes: self.attributes,
                 viewport: VRViewport::new(1512/2, 0, 1512/2, 1680)
             }]

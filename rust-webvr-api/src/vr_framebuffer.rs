@@ -2,8 +2,8 @@
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRFramebuffer {
-    // Framebuffer identifier
-    pub id: u32,
+    // Eye index of the framebuffer
+    pub eye_index: u32,
 
     // The attributes set up for this framebuffer
     pub attributes: VRFramebufferAttributes,

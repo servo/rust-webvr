@@ -1,19 +1,27 @@
 extern crate gl_generator;
 
 use std::env;
-use std::fs::File;
+use std::fs::{self, File};
 use std::path::Path;
 use gl_generator::{Registry, Api, Profile, Fallbacks};
 
 fn main() {
+    // Copy AARs
+    if let Ok(aar_out_dir) = env::var("AAR_OUT_DIR") {
+        fs::copy(&Path::new("src/api/googlevr/aar/GVRService.aar"),
+                 &Path::new(&aar_out_dir).join("GVRService.aar")).unwrap();
+
+        fs::copy(&Path::new("src/api/oculusvr/aar/OVRService.aar"),
+                 &Path::new(&aar_out_dir).join("OVRService.aar")).unwrap();
+    }
 
     if !cfg!(feature = "googlevr") && !cfg!(feature = "oculusvr")  {
         return;
     }
 
-    let dest = env::var("OUT_DIR").unwrap();
+    let out_dir = env::var("OUT_DIR").unwrap();
 
-    let mut file = File::create(&Path::new(&dest).join("gles_bindings.rs")).unwrap();
+    let mut file = File::create(&Path::new(&out_dir).join("gles_bindings.rs")).unwrap();
 
     // GLES 2.0 bindings
     let gles_reg = Registry::new(Api::Gles2, (3, 0), Profile::Core, Fallbacks::All, [

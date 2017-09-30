@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.9.3"
+version = "0.9.4"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"

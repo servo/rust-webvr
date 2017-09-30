@@ -371,7 +371,7 @@ impl OpenVRDisplay {
 
     fn fetch_view_matrix(&self, display_pose: &openvr::TrackedDevicePose_t, out: &mut [f32; 16]) {
         if !display_pose.bPoseIsValid {
-            *out = identity_matrix!();
+            *out = [1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0];
         } else {
             *out = openvr_matrix34_to_array(&display_pose.mDeviceToAbsoluteTracking);
         }

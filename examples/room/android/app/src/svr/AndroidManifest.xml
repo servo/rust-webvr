@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BEGIN_INCLUDE(manifest) -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:installLocation="auto"
+        package="com.rust.webvr">
+    <supports-screens android:smallScreens="true" android:normalScreens="true" android:largeScreens="true" android:xlargeScreens="true" android:anyDensity="true" />
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application android:label="rust-webvr" android:icon="@mipmap/servo">
+        <activity android:name=".MainActivity"
+                android:launchMode="singleTop"
+                android:label="rust-webvr"
+                android:screenOrientation="reverseLandscape"
+                android:configChanges="orientation|keyboardHidden|screenSize"
+                android:resizeableActivity="false">
+            <meta-data android:name="com.osterhoutgroup.display_mode" android:value="extend"/>
+            <meta-data android:name="android.app.lib_name" android:value="webvr" />
+            <!-- Intent filter that enables this app to be launched from the
+     Daydream Home menu. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+<!-- END_INCLUDE(manifest) -->

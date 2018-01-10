@@ -18,6 +18,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
 
     private static native void nativeOnPause(long ptr);
     private static native void nativeOnResume(long ptr);
+    private static native void nativeOnDestroy(long ptr);
     private static native void nativeOnSurfaceChanged(long ptr, Surface surface);
     private static native void nativeOnSurfaceDestroyed(long ptr);
 
@@ -133,6 +134,7 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
     public void onActivityDestroyed(Activity activity) {
         if (mActivity == activity) {
             activity.getApplication().unregisterActivityLifecycleCallbacks(this);
+            nativeOnDestroy(mPtr);
             mActivity = null; // Don't leak activity
         }
     }

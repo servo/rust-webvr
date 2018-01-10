@@ -657,6 +657,7 @@ pub fn main() {
             }
         }
        
+        println!("render");
         if !direct_draw {
             gl.flush();
         }

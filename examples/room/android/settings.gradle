@@ -4,3 +4,5 @@ include ':GVRService'
 project(':GVRService').projectDir = new File('../../../rust-webvr/src/api/googlevr/gradle')
 include ':OVRService'
 project(':OVRService').projectDir = new File('../../../rust-webvr/src/api/oculusvr/gradle')
+include ':SVRService'
+project(':SVRService').projectDir = new File('/home/mortimer/Projects/rust-svr/gradle')

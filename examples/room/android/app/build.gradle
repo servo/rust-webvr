@@ -7,7 +7,7 @@ android {
     defaultConfig {
         applicationId "com.rust.webvr"
         minSdkVersion 21
-        targetSdkVersion 25
+        targetSdkVersion 23
         versionCode 1
         versionName "1.0.0"
         jackOptions {
@@ -32,6 +32,8 @@ android {
         daydream {
         }
         gearvr {
+        }
+        svr {
         }
     }
 
@@ -121,6 +123,7 @@ task appStart(type: Exec, dependsOn: 'installArmRelease') {
 dependencies {
     daydreamCompile project(':GVRService')
     gearvrCompile project(':OVRService')
+    svrCompile project(':SVRService')
 }
 
 
@@ -145,7 +148,7 @@ String getApkPath(boolean debug, String arch) {
 
 def getJniLibsPath(boolean debug, String arch) {
     return [
-        getTargetDir(debug, arch) + "/libs",
+        "/home/mortimer/Projects/rust-webvr/examples/room/target/arm-linux-androideabi/release/libs",
         "../libs"
     ]
 }

@@ -23,7 +23,7 @@ public class MainActivity extends android.app.NativeActivity {
     static {
         //System.loadLibrary("gvr");
         //System.loadLibrary("gvr_audio");
-        System.loadLibrary("vrapi");
+        System.loadLibrary("svrapi");
         System.loadLibrary("webvr");
     }
 

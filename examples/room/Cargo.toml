@@ -16,3 +16,5 @@ rust-svr = { path = "../../../rust-svr" }
 [target.'cfg(target_os = "android")'.dependencies]
 android_injected_glue = {git = "https://github.com/mmatyas/android-rs-injected-glue"}
 
+[replace]
+"ovr-mobile-sys:0.3.1" = { path= "/home/mortimer/Projects/ovr-mobile-sys" }

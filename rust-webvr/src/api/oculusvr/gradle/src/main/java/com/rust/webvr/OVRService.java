@@ -2,6 +2,7 @@ package com.rust.webvr;
 
 import android.app.Activity;
 import android.app.Application;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Surface;
@@ -70,7 +71,8 @@ class OVRService  implements Application.ActivityLifecycleCallbacks, SurfaceHold
                 }
                 // Show SurfaceView
                 FrameLayout rootLayout = (FrameLayout) mActivity.findViewById(android.R.id.content);
-                rootLayout.addView(mSurfaceView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+                //rootLayout.addView(mSurfaceView, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+                rootLayout.addView(mSurfaceView, new LayoutParams(1024, 1024));
 
                 mPresenting = true;
             }

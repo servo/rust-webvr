@@ -5,6 +5,7 @@ use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREvent, VRDisplayEvent,
     VREyeParameters, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRLayer, VRViewport};
 use android_injected_glue::ffi as ndk;
 use gl;
+use egl;
 use ovr_mobile_sys as ovr;
 use ovr_mobile_sys::ovrFrameLayerEye::*;
 use ovr_mobile_sys::ovrSystemProperty::*;
@@ -23,8 +24,6 @@ use rust_webvr_api::utils;
 pub type OculusVRDisplayPtr = Arc<RefCell<OculusVRDisplay>>;
 
 extern {
-    fn eglGetCurrentContext() -> *mut c_void;
-    fn eglGetCurrentDisplay() -> *mut c_void;
     fn ANativeWindow_fromSurface(env: *mut c_void, surface: *mut c_void) -> *mut c_void;
 }
 
@@ -47,7 +46,7 @@ pub struct OculusVRDisplay {
     read_texture: u32,
     frame_index: i64,
     predicted_display_time: f64,
-    predicted_tracking: ovr::ovrTracking,
+    predicted_tracking: ovr::ovrTracking2,
     eye_projection: Cell<ovr::ovrMatrix4f>,
     presenting: bool,
     activity_paused: bool,
@@ -90,7 +89,7 @@ impl VRDisplay for OculusVRDisplay {
         let mut data = VRFrameData::default();
 
         if !self.activity_paused && self.is_in_vr_mode() {
-            let tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, 0.0) };
+            let tracking = unsafe { ovr::vrapi_GetPredictedTracking2(self.ovr, 0.0) };
             self.fetch_frame_data(self.data_ovr_java, &tracking,
                                   &mut data,
                                   near as f32,
@@ -133,7 +132,7 @@ impl VRDisplay for OculusVRDisplay {
 
         self.frame_index += 1;
         self.predicted_display_time =  unsafe { ovr::vrapi_GetPredictedDisplayTime(self.ovr, self.frame_index) };
-        self.predicted_tracking = unsafe { ovr::vrapi_GetPredictedTracking(self.ovr, self.predicted_display_time) };
+        self.predicted_tracking = unsafe { ovr::vrapi_GetPredictedTracking2(self.ovr, self.predicted_display_time) };
 
         if self.gamepads.len() < 2 {
             OculusVRGamepad::refresh_available_gamepads(self.ovr, self.display_id, &mut self.gamepads);
@@ -197,14 +196,16 @@ impl VRDisplay for OculusVRDisplay {
 
             // BlitFramebuffer: external texture to gvr pixel buffer.
             unsafe {
-                gl::BindFramebuffer(gl::FRAMEBUFFER, eye.fbos[swap_chain_index as usize]);
-                gl::BindFramebuffer(gl::READ_FRAMEBUFFER, self.read_fbo);
+                gl::BindFramebuffer(gl::DRAW_FRAMEBUFFER, eye.fbos[swap_chain_index as usize]);
+                gl::ClearColor(1.0, 0.0, 0.0, 1.0);
+                gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
+                /*gl::BindFramebuffer(gl::READ_FRAMEBUFFER, self.read_fbo);
                 let w = texture_size.0/2;
                 let x0 = (i as u32) * w;
                 let x1 = x0 + w;
                 gl::BlitFramebuffer(x0 as i32, 0, x1 as i32, texture_size.1 as i32,
                                     0, 0, eye.width as i32, eye.height as i32,
-                                    gl::COLOR_BUFFER_BIT, gl::LINEAR);
+                                    gl::COLOR_BUFFER_BIT, gl::LINEAR);*/
             }
         }
 
@@ -213,6 +214,60 @@ impl VRDisplay for OculusVRDisplay {
             gl::BindFramebuffer(gl::FRAMEBUFFER, current_fbo as u32);
         }
     }
+
+    /*fn submit_frame(&mut self) {
+        if self.activity_paused || !self.is_in_vr_mode() {
+            return;
+        }
+        println!("predicted_display_time {}", self.predicted_display_time);
+
+        let eye_projection = self.eye_projection.get();
+        let tex_coords = ovr::helpers::ovrMatrix4f_TanAngleMatrixFromProjection(&eye_projection);
+
+        let layer2 = ovr::helpers::vrapi_DefaultLayerLoadingIcon2();
+        let mut layer = ovr::helpers::vrapi_DefaultLayerProjection2();
+        layer.HeadPose = self.predicted_tracking.HeadPose;
+        for i in 0..VRAPI_FRAME_LAYER_EYE_MAX as usize {
+            let eye = if self.eye_framebuffers.len() > 1 {
+                &self.eye_framebuffers[i]
+            } else {
+                &self.eye_framebuffers[0]
+            };
+
+            let swap_chain_index = (self.frame_index % eye.swap_chain_length as i64) as i32;
+
+            println!("Eye {} frame_index {} swap_index {} swap_length {}", i, self.frame_index, swap_chain_index, eye.swap_chain_length);
+
+            layer.Textures[i].ColorSwapChain = eye.swap_chain;
+            layer.Textures[i].SwapChainIndex = swap_chain_index;
+            //layer.Textures[i].TexCoordsFromTanAngles =  ovr::helpers::ovrMatrix4f_TanAngleMatrixFromProjection(&self.predicted_tracking.Eye[i].ProjectionMatrix);
+
+        // Create and insert a new sync object.
+        let fence = unsafe {
+            let display = egl::GetCurrentDisplay();
+            let fence = egl::CreateSyncKHR( display, egl::SYNC_FENCE_KHR, ptr::null());
+            if fence == egl::NO_SYNC {
+                println!("eglCreateSyncKHR() : EGL_NO_SYNC_KHR" );
+            } else if egl::ClientWaitSyncKHR(display, fence, egl::SYNC_FLUSH_COMMANDS_BIT as i32, 0 ) == egl::FALSE as i32 {
+                println!( "eglClientWaitSyncKHR() : EGL_FALSE" );
+            }
+            fence
+        };
+        
+        let mut frame_desc: ovr::ovrSubmitFrameDescription2 = unsafe { mem::zeroed() };
+        frame_desc.Flags = 0;
+		frame_desc.SwapInterval = 1;
+        frame_desc.FrameIndex = self.frame_index as u64;
+        frame_desc.DisplayTime = self.predicted_display_time;
+        frame_desc.CompletionFence = unsafe { mem::transmute(fence as u64) };
+        let layers = [&layer.Header as * const ovr::ovrLayerHeader2];
+        frame_desc.LayerCount = layers.len() as u32;
+        frame_desc.Layers = layers.as_ptr();
+
+        unsafe {
+            ovr::vrapi_SubmitFrame2(self.ovr, &frame_desc);
+        }
+    }*/
 
     fn submit_frame(&mut self) {
         if self.activity_paused || !self.is_in_vr_mode() {
@@ -336,7 +391,7 @@ impl OculusVRDisplay {
             return;
         }
 
-        let display = unsafe { eglGetCurrentDisplay() };
+        let display = unsafe { egl::GetCurrentDisplay() };
 
         // Return if display is not ready yet to avoid EGL_NO_DISPLAY error in vrapi_EnterVrMode.
         // Sometines it takes a bit more time for the Display to be ready.
@@ -345,6 +400,8 @@ impl OculusVRDisplay {
         }
 
         let mut mode = ovr::helpers::vrapi_DefaultModeParms(self.render_ovr_java.handle());
+        // Must reset the FLAG_FULLSCREEN window flag when using a SurfaceView
+		//mode.Flags |= ovr::ovrModeFlags::VRAPI_MODE_FLAG_RESET_WINDOW_FULLSCREEN as u32;
         mode.Flags |= ovr::ovrModeFlags::VRAPI_MODE_FLAG_NATIVE_WINDOW as u32;
 
         let env = self.render_ovr_java.jni_scope.as_ref().unwrap().env;
@@ -352,7 +409,7 @@ impl OculusVRDisplay {
 
         mode.WindowSurface = unsafe { ANativeWindow_fromSurface(env as *mut _, surface as *mut _) as u64 };
         mode.Display = display as u64;
-        mode.ShareContext = unsafe { eglGetCurrentContext() as u64 };
+        mode.ShareContext = unsafe { egl::GetCurrentContext() as u64 };
 
         debug!("Enter VR Mode {:?}", mode);
 
@@ -363,6 +420,7 @@ impl OculusVRDisplay {
         }
 
         unsafe {
+            // Set the tracking transform to use, by default this is eye level.
             ovr::vrapi_SetRemoteEmulation(self.ovr, false);
         }
 
@@ -485,7 +543,7 @@ impl OculusVRDisplay {
 
     fn fetch_frame_data(&self,
                         java: *const ovr::ovrJava, 
-                        tracking: &ovr::ovrTracking,
+                        tracking: &ovr::ovrTracking2,
                         out: &mut VRFrameData,
                         near: f32,
                         far: f32) {
@@ -504,19 +562,12 @@ impl OculusVRDisplay {
         out.left_projection_matrix = projection;
         out.right_projection_matrix = projection;
 
+        out.left_projection_matrix = ovr_mat4_to_array(&tracking.Eye[0].ProjectionMatrix);;
+        out.right_projection_matrix = ovr_mat4_to_array(&tracking.Eye[1].ProjectionMatrix);;
+
         // View Matrix
-        let model_params = ovr::helpers::vrapi_DefaultHeadModelParms();
-        let tracking = ovr::helpers::vrapi_ApplyHeadModel(&model_params, tracking);
-        
-        let center_matrix = ovr::helpers::vrapi_GetCenterEyeViewMatrix(&model_params, &tracking, None);
-        let left_eye_view_matrix = ovr::helpers::vrapi_GetEyeViewMatrix(&model_params,
-                                                                        &center_matrix,
-                                                                        VRAPI_FRAME_LAYER_EYE_LEFT as i32);
-        let right_eye_view_matrix = ovr::helpers::vrapi_GetEyeViewMatrix(&model_params,
-                                                                         &center_matrix,
-                                                                         VRAPI_FRAME_LAYER_EYE_RIGHT as i32);
-        out.left_view_matrix = ovr_mat4_to_array(&left_eye_view_matrix);
-        out.right_view_matrix = ovr_mat4_to_array(&right_eye_view_matrix);
+        out.left_view_matrix = ovr_mat4_to_array(&tracking.Eye[0].ViewMatrix);
+        out.right_view_matrix = ovr_mat4_to_array(&tracking.Eye[1].ViewMatrix);
 
         // Pose
         out.pose.orientation = Some(ovr_quat_to_array(&tracking.HeadPose.Pose.Orientation));
@@ -692,7 +743,7 @@ impl OculusEyeFramebuffer {
                 }
 
             } else {
-                gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, texture, 0);
+                gl::FramebufferTexture2D(gl::DRAW_FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, texture, 0);
                 if attributes.depth {
                     gl::GenRenderbuffers(1, &mut depth);
                     gl::BindRenderbuffer(gl::RENDERBUFFER, depth);
@@ -706,6 +757,8 @@ impl OculusEyeFramebuffer {
             if status != gl::FRAMEBUFFER_COMPLETE {
                 panic!("Oculus VR Incomplete Framebuffer: {}", status);
             }
+            gl::ClearColor(0.0, 1.0, 0.0, 1.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
             if depth > 0 {
                 depth_buffers.push(depth);

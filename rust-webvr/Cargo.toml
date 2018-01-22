@@ -19,7 +19,7 @@ exclude = [
 build = "build.rs"
 
 [features]
-default = ["openvr", "mock"]
+default = ["oculusvr", "mock"]
 openvr = ["libloading"]
 mock = []
 googlevr = ["gvr-sys"]

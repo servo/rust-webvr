@@ -15,12 +15,6 @@ use std::{thread, time};
 
 use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData, VRFramebufferAttributes};
 
-#[cfg(target_os = "android")]
-extern crate rust_svr;
-#[cfg(target_os = "android")]
-use rust_svr::SVRServiceCreator;
-use webvr::VRServiceCreator;
-
 type Vec3 = Vector3<f32>;
 type Mat4 = Matrix4<f32>;
 
@@ -412,10 +406,7 @@ pub fn main() {
     let mut vr = VRServiceManager::new();
     // Register default VRService implementations and initialize them.
     // Default VRServices are specified using cargo features.
-    //vr.register_defaults();
-    if cfg!(target_os = "android") {
-        vr.register(SVRServiceCreator::new().new_service());
-    }
+    vr.register_defaults();
     // Add a mock service to allow running the demo when no VRDisplay is available.
     // If no VR service is found the demo fallbacks to the Mock.
     vr.register_mock();

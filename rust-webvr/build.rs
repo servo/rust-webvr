@@ -21,11 +21,18 @@ fn main() {
 
     let out_dir = env::var("OUT_DIR").unwrap();
 
-    let mut file = File::create(&Path::new(&out_dir).join("gles_bindings.rs")).unwrap();
-
     // GLES 2.0 bindings
+    let mut file = File::create(&Path::new(&out_dir).join("gles_bindings.rs")).unwrap();
     let gles_reg = Registry::new(Api::Gles2, (3, 0), Profile::Core, Fallbacks::All, [
         "GL_OVR_multiview2", "GL_OVR_multiview", "GL_OVR_multiview_multisampled_render_to_texture"]);
     gles_reg.write_bindings(gl_generator::StaticGenerator, &mut file)
             .unwrap();
+
+    // EGL bindings
+    if cfg!(feature = "oculusvr") {
+        let mut file = File::create(&Path::new(&out_dir).join("egl_bindings.rs")).unwrap();
+        Registry::new(Api::Egl, (1, 5), Profile::Core, Fallbacks::All, ["EGL_KHR_fence_sync"])
+            .write_bindings(gl_generator::StaticGenerator, &mut file).unwrap();
+        println!("cargo:rustc-link-lib=EGL");
+    }
 }

@@ -1,6 +1,8 @@
 package com.rust.webvr;
 import android.graphics.Color;
+import android.opengl.GLES20;
 import android.os.Bundle;
+import android.util.AttributeSet;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -13,12 +15,15 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.lang.System;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class MainActivity extends android.app.NativeActivity {
     private static final String LOGTAG = "WebVRExample";
+    private FrameLayout mContentView;
+    private ArrayList<SurfaceTextureRenderer> mViews = new ArrayList();
 
     static {
         //System.loadLibrary("gvr");
@@ -38,13 +43,13 @@ public class MainActivity extends android.app.NativeActivity {
         super.onCreate(savedInstanceState);
         getWindow().takeSurface(null);
 
-        FrameLayout layout = new FrameLayout(this);
-        layout.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+        mContentView = new FrameLayout(this);
+        mContentView.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
                                                             FrameLayout.LayoutParams.MATCH_PARENT));
         SurfaceView nativeSurface = new SurfaceView(this);
         nativeSurface.getHolder().addCallback(this);
-        layout.addView(nativeSurface, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        setContentView(layout);
+        mContentView.addView(nativeSurface, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        setContentView(mContentView);
 
         keepScreenOn();
         addFullScreenListener();
@@ -114,6 +119,34 @@ public class MainActivity extends android.app.NativeActivity {
             }
         } finally {
             if (zipFile != null) zipFile.close();
+        }
+    }
+
+    private int createAndroidView(final int width, final int height)
+    {
+        SurfaceTextureRenderer renderer = new SurfaceTextureRenderer();
+        renderer.initialize(width, height);
+        mViews.add(renderer);
+
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                GLWebView view = new GLWebView(MainActivity.this);
+                view.setRenderer(renderer);
+                mContentView.addView(view, new FrameLayout.LayoutParams(width, height));
+                view.loadUrl("http://www.marca.com");
+            }
+        });
+
+        int mortimer = renderer.textureId();
+
+        return renderer.textureId();
+    }
+
+    private void updateSurfaceTextures()
+    {
+        for (SurfaceTextureRenderer renderer: mViews) {
+            renderer.updateTexture();
         }
     }
 }

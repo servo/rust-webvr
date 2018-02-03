@@ -14,6 +14,7 @@ use std::path::Path;
 use std::{thread, time};
 
 use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData, VRFramebufferAttributes};
+use webvr::jni_utils::JNIScope;
 
 type Vec3 = Vector3<f32>;
 type Mat4 = Matrix4<f32>;
@@ -87,15 +88,16 @@ const FRAGMENT_SHADER: &'static str = r#"
     }
 "#;
 
-const FRAGMENT_SHADER2: &'static str = r#"
+const FRAGMENT_SHADER_EXTERNAL: &'static str = r#"
+    #extension GL_OES_EGL_image_external_essl3: require
     precision highp float;
-    uniform sampler2D sampler;
+    uniform samplerExternalOES sampler_ext;
 
     in vec2 v_uv;
     out vec4 color;
 
     void main() {
-        vec4 c = texture(sampler, v_uv);
+        vec4 c = texture(sampler_ext, v_uv);
         color = c;
         
     }
@@ -251,10 +253,11 @@ struct Mesh {
     pub index_count: u32,
     pub transform: Mat4,
     pub texture: GLuint,
+    pub external_texture: bool,
 }
 
 impl Mesh {
-    fn new_plane(gl: &Gl, tex: GLuint, size:[f32;2], pos:[f32;3], rot:[f32;3], scale:[f32;3]) -> Mesh {
+    fn new_plane(gl: &Gl, tex: GLuint, size:[f32;2], pos:[f32;3], rot:[f32;3], scale:[f32;3], external_texture: bool) -> Mesh {
         let dx = size[0] * 0.5;
         let dy = size[1] * 0.5;
         let buffer = build_vertex_buffer(gl, &[
@@ -274,7 +277,8 @@ impl Mesh {
             index_buffer: index_buffer,
             index_count: 4,
             transform: matrix,
-            texture: tex
+            texture: tex,
+            external_texture
         }
     }
 
@@ -332,7 +336,8 @@ impl Mesh {
             index_buffer: build_indices_buffer(gl, &indices),
             index_count: indices.len() as u32,
             transform: matrix,
-            texture: tex
+            texture: tex,
+            external_texture: false
         }
     }
 
@@ -350,12 +355,17 @@ impl Mesh {
             index_buffer: build_indices_buffer(gl, &indices),
             index_count: indices.len() as u32,
             transform: Matrix4::<f32>::identity(),
-            texture: tex
+            texture: tex,
+            external_texture: false
         }
     }
 
     fn draw(&self, gl: &Gl) {
-        gl.bind_texture(gl::TEXTURE_2D, self.texture);
+        if self.external_texture {
+            gl.bind_texture(gl::TEXTURE_EXTERNAL_OES, self.texture);
+        } else {
+            gl.bind_texture(gl::TEXTURE_2D, self.texture);
+        }
         gl.bind_buffer(gl::ARRAY_BUFFER, self.vertex_buffer);
         gl.bind_buffer(gl::ELEMENT_ARRAY_BUFFER, self.index_buffer);
         gl.vertex_attrib_pointer(0, 3, gl::FLOAT, false, mem::size_of::<Vertex>() as i32, 0);
@@ -402,6 +412,15 @@ fn gl_version() -> glutin::GlRequest {
 }
 
 pub fn main() {
+    // JNI methods
+    let jni_scope = unsafe { JNIScope::attach().unwrap() };
+    let jni = jni_scope.jni();
+    let jni_env = jni_scope.env;
+    let jni_activity_class = unsafe{ jni_scope.find_class("com/rust/webvr/MainActivity").unwrap() };
+    let jni_activity = (jni.NewGlobalRef)(jni_env, jni_scope.activity);
+    let jni_create_view = unsafe { jni_scope.get_method(jni_activity_class, "createAndroidView", "(II)I", false) };
+    let jni_update_textures = unsafe { jni_scope.get_method(jni_activity_class, "updateSurfaceTextures", "()V", false) };
+
      // Initialize VR Services
     let mut vr = VRServiceManager::new();
     // Register default VRService implementations and initialize them.
@@ -444,7 +463,7 @@ pub fn main() {
     // We can use data.left_view_matrix or data.pose to render the scene
     let test_pose = false;
     // Draw to the HDM frmebuffer directly instead of using a texture
-    let direct_draw = false;
+    let direct_draw = true;
     let multiview = false;
 
     if multiview && !direct_draw {
@@ -463,6 +482,8 @@ pub fn main() {
     };
     let gl = &*gl;
 
+
+    let mortimer: i32 = (jni.CallIntMethod)(jni_env, jni_activity, jni_create_view, 1024, 768);
 
     let screen_fbo = gl.get_integer_v(gl::FRAMEBUFFER_BINDING) as u32;
     let screen_size = window.get_inner_size_pixels().unwrap();
@@ -489,19 +510,24 @@ pub fn main() {
                       &["projection", "view", "model", "sampler"],
                       &["position", "uv"])
     };
-    let prog_fb = build_program(gl, VERTEX_SHADER_FB, FRAGMENT_SHADER2,
+    let prog_fb = build_program(gl, VERTEX_SHADER_FB, FRAGMENT_SHADER,
                              &["matrix", "sampler"], &["position", "uv"]);
+
+    let prog_surface_texture = build_program(gl, VERTEX_SHADER_MVP, FRAGMENT_SHADER_EXTERNAL,
+                                             &["projection", "view", "model", "sampler_ext"],
+                                             &["position", "uv"]);
 
     let mut meshes = Vec::new();
     // Sky sphere
     meshes.push(Mesh::new_sphere(gl, sky_tex, 50.0, [0.0, 0.0, 0.0], [0.0, PI, 0.0]));
     // floor
-    meshes.push(Mesh::new_plane(gl, floor_tex, [width,depth], [0.0, 0.0, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0]));
+    meshes.push(Mesh::new_plane(gl, floor_tex, [width,depth], [0.0, 0.0, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0], false));
     // walls
-    meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0]));
-    meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0]));
-    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0]));
-    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [-1.0,1.0,1.0]));
+    meshes.push(Mesh::new_plane(gl, mortimer as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], true));
+    //meshes.push(Mesh::new_plane(gl, wall_tex as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], false));
+    meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0], false));
+    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0], false));
+    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [-1.0,1.0,1.0], false));
 
     let fbo_to_screen = Mesh::new_quad(gl, target_texture);
 
@@ -558,6 +584,13 @@ pub fn main() {
 
     let mut event_counter = 0u64;
 
+    gl.use_program(prog_surface_texture.id);
+    gl.active_texture(gl::TEXTURE0);
+    gl.uniform_1i(prog_surface_texture.loc("sampler_ext"), 0);
+    gl.use_program(prog.id);
+    gl.active_texture(gl::TEXTURE0);
+    gl.uniform_1i(prog.loc("sampler"), 0);
+
     loop {
         display.borrow_mut().sync_poses();
 
@@ -602,11 +635,10 @@ pub fn main() {
 
         gl.enable(gl::SCISSOR_TEST);
         gl.use_program(prog.id);
-        gl.active_texture(gl::TEXTURE0);
-        gl.uniform_1i(prog.loc("sampler"), 0);
         gl.enable_vertex_attrib_array(0); // position
         gl.enable_vertex_attrib_array(1); // uv
 
+        (jni.CallVoidMethod)(jni_env, jni_activity, jni_update_textures);
         for (i, eye) in eyes.iter().enumerate() {
             let viewport = eye.0;
             let projection = vec_to_matrix(eye.1);
@@ -617,16 +649,19 @@ pub fn main() {
                 display.borrow_mut().bind_framebuffer(i as u32);
             }
 
-            if multiview {
-                gl.uniform_matrix_4fv(prog.loc("left_projection"), false, matrix_to_uniform(&projection));
-                gl.uniform_matrix_4fv(prog.loc("left_view"), false, matrix_to_uniform(&eye_view));
-                let right_projection = vec_to_matrix(eyes[1].1);
-                let right_eye_view = eyes[1].2 * standing_transform;
-                gl.uniform_matrix_4fv(prog.loc("right_projection"), false, matrix_to_uniform(&right_projection));
-                gl.uniform_matrix_4fv(prog.loc("right_view"), false, matrix_to_uniform(&right_eye_view));
-            } else {
-                gl.uniform_matrix_4fv(prog.loc("projection"), false, matrix_to_uniform(&projection));
-                gl.uniform_matrix_4fv(prog.loc("view"), false, matrix_to_uniform(&eye_view));
+            for prog in &[&prog, &prog_surface_texture] {
+                gl.use_program(prog.id);
+                if multiview {
+                    gl.uniform_matrix_4fv(prog.loc("left_projection"), false, matrix_to_uniform(&projection));
+                    gl.uniform_matrix_4fv(prog.loc("left_view"), false, matrix_to_uniform(&eye_view));
+                    let right_projection = vec_to_matrix(eyes[1].1);
+                    let right_eye_view = eyes[1].2 * standing_transform;
+                    gl.uniform_matrix_4fv(prog.loc("right_projection"), false, matrix_to_uniform(&right_projection));
+                    gl.uniform_matrix_4fv(prog.loc("right_view"), false, matrix_to_uniform(&right_eye_view));
+                } else {
+                    gl.uniform_matrix_4fv(prog.loc("projection"), false, matrix_to_uniform(&projection));
+                    gl.uniform_matrix_4fv(prog.loc("view"), false, matrix_to_uniform(&eye_view));
+                }
             }
 
             gl.viewport(viewport.0, viewport.1, viewport.2, viewport.3);
@@ -638,6 +673,11 @@ pub fn main() {
             }
 
             for mesh in &meshes {
+                if mesh.external_texture {
+                    gl.use_program(prog_surface_texture.id);
+                } else {
+                    gl.use_program(prog.id);
+                }
                 gl.uniform_matrix_4fv(prog.loc("model"), false, matrix_to_uniform(&mesh.transform));
                 mesh.draw(gl);
             }
@@ -647,6 +687,8 @@ pub fn main() {
                 break;
             }
         }
+
+        gl.active_texture(gl::TEXTURE0);
        
         if !direct_draw {
             gl.flush();

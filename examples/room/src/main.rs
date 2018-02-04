@@ -247,6 +247,95 @@ fn build_fbo_texture(gl: &Gl, width: u32, height: u32) -> GLuint {
     texture
 }
 
+
+// S1 +------+ S2
+//    |      |
+//    |      |
+// S3 +------+ S4
+struct Plane {
+    s1: Vec3,
+    s2: Vec3,
+    s3: Vec3,
+    s4: Vec3,
+    view_id: Option<u32>
+}
+
+impl Plane {
+    fn new(transform: &Mat4, size:[f32;2], view_id: Option<u32>) -> Plane {
+        let dx = size[0] * 0.5;
+        let dy = size[1] * 0.5;
+        let s1 = transform * Vector4::new(-1.0 * dx, 1.0 * dy, 0.0, 1.0);
+        let s2 = transform * Vector4::new( 1.0 * dx, 1.0 * dy, 0.0, 1.0);
+        let s3 = transform * Vector4::new(-1.0 * dx, -1.0 * dy, 0.0, 1.0);
+        let s4 = transform * Vector4::new(1.0 * dx, -1.0 * dy, 0.0, 1.0);
+
+        let mut s1 = Vec3::new(s1.x, s1.y, s1.z);
+        let mut s2 = Vec3::new(s2.x, s2.y, s2.z);
+        let mut s3 = Vec3::new(s3.x, s3.y, s3.z);
+        let mut s4 = Vec3::new(s4.x, s4.y, s4.z);
+
+        if s1.y < s3.y {
+            ::std::mem::swap(&mut s1, &mut s3);
+            ::std::mem::swap(&mut s2, &mut s4);
+        }
+
+        if s1.x > s2.x {
+            ::std::mem::swap(&mut s1, &mut s2);
+            ::std::mem::swap(&mut s3, &mut s4);
+        }
+
+        //println!("plane: {:?} {:?} {:?} {:?}", s1, s2, s3, s4);
+
+        Plane {
+            s1,
+            s2,
+            s3,
+            s4,
+            view_id
+        }
+    }
+
+    fn intersect(&self, origin: &Vec3, direction: &Vec3) -> Option<Vec3> {
+        let r1 = origin;
+        let r2 = origin + direction * 6.0;
+
+        // Normal to the plane
+        let ds21 = self.s2 - self.s1;
+        let ds31 = self.s3 - self.s1;
+        let n = ds21.cross(ds31);
+
+        // Compute ray plane intersection
+        let dr = r1 - r2;
+        let ndr = n.dot(dr);
+
+        if ndr.abs() < 0.0000001 {
+            return None;
+        }
+
+        let t = -n.dot(r1 - self.s1) / ndr;
+        let m = r1 + dr * t;
+
+        // Check bounds
+        let dms1 = m - self.s1;
+        let u = dms1.dot(ds21);
+        let v = dms1.dot(ds31);
+
+        if u < 0.0 || u > ds21.dot(ds21) || v < 0.0 || v > ds31.dot(ds31) {
+            return None;
+        }
+            
+        // Check same direction
+        let target_dir = m - origin;
+        if target_dir.x.signum() == direction.x.signum()
+           && target_dir.y.signum() == direction.y.signum()
+           && target_dir.z.signum() == direction.z.signum() {
+            Some(m)
+        } else {
+            None
+        }
+    }
+}
+
 struct Mesh {
     pub vertex_buffer: GLuint,
     pub index_buffer: GLuint,
@@ -257,7 +346,14 @@ struct Mesh {
 }
 
 impl Mesh {
-    fn new_plane(gl: &Gl, tex: GLuint, size:[f32;2], pos:[f32;3], rot:[f32;3], scale:[f32;3], external_texture: bool) -> Mesh {
+    fn transform(&mut self, pos:[f32;3], rot:[f32;3], scale:[f32;3]) {
+        let rotation = Matrix4::from(Euler { x: Rad(rot[0]), y: Rad(rot[1]), z: Rad(rot[2]) });
+        let translation = Matrix4::from_translation(Vec3::new(pos[0], pos[1], pos[2]));
+        let scale = Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
+        self.transform = translation * scale * rotation;
+    }
+
+    fn new_plane(gl: &Gl, tex: GLuint, size:[f32;2], pos:[f32;3], rot:[f32;3], scale:[f32;3], external_texture: bool, out: &mut Vec<Plane>) -> Mesh {
         let dx = size[0] * 0.5;
         let dy = size[1] * 0.5;
         let buffer = build_vertex_buffer(gl, &[
@@ -271,6 +367,8 @@ impl Mesh {
         let scale = Matrix4::from_nonuniform_scale(scale[0], scale[1], scale[2]);
         let translation = Matrix4::from_translation(Vec3::new(pos[0], pos[1], pos[2]));
         let matrix =  translation * scale * rotation;
+
+        out.push(Plane::new(&matrix, size, if external_texture { Some(tex)} else { None } ));
     
         Mesh {
             vertex_buffer: buffer,
@@ -567,7 +665,7 @@ pub fn main() {
     let floor_tex = build_texture(gl, "floor.jpg");
     let wall_tex = build_texture(gl, "wall.jpg");
     let sky_tex = build_texture(gl, "sky.jpg");
-    let reticle_tex = build_texture(gl, "reticle.png");
+    let reticle_tex = build_texture(gl, "pointer.jpg");
     println!("Textures loaded!");
 
     // texture to be used as a framebuffer
@@ -589,20 +687,20 @@ pub fn main() {
                                              &["position", "uv"]);
 
     let mut meshes = Vec::new();
+    let mut input_planes = Vec::new();
     // Sky sphere
     meshes.push(Mesh::new_sphere(gl, sky_tex, 50.0, [0.0, 0.0, 0.0], [0.0, PI, 0.0]));
     // floor
-    meshes.push(Mesh::new_plane(gl, floor_tex, [width,depth], [0.0, 0.0, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0], false));
+    meshes.push(Mesh::new_plane(gl, floor_tex, [width,depth], [0.0, 0.0, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0], false, &mut input_planes));
     // walls
-    meshes.push(Mesh::new_plane(gl, mortimer as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], true));
+    meshes.push(Mesh::new_plane(gl, mortimer as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], true, &mut input_planes));
     //meshes.push(Mesh::new_plane(gl, wall_tex as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], false));
-    meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0], false));
-    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0], false));
-    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [-1.0,1.0,1.0], false));
+    meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
+    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
+    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
 
     //let reticle = Mesh::new_plane(gl, reticle_tex, [0.2,0.2], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], false);
-    let reticle = Mesh::new_sphere(gl, reticle_tex, 0.1, [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0]);
-    meshes.push(reticle);
+    meshes.push(Mesh::new_sphere(gl, reticle_tex, 0.02, [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0]));
 
     let fbo_to_screen = Mesh::new_quad(gl, target_texture);
 
@@ -682,7 +780,24 @@ pub fn main() {
         for gamepad in gamepads {
             let gamepad = gamepad.borrow();
             let state = gamepad.state();
-            let orientation = state.pose.orientation.unwrap();
+            let gamepad_orientation = state.pose.orientation.unwrap();
+            let gamepad_quaternion = vec_to_quaternion(&gamepad_orientation);
+
+            let orig = Vec3::new(0.0, height * 0.5, 0.0);
+            let direction = gamepad_quaternion * Vec3::new(0.0, 0.0, -1.0);
+
+            let mut target = orig + direction * 3.0;
+
+            // Input mapping raycast
+            for plane in &input_planes {
+                if let Some(point) = plane.intersect(&orig, &direction) {
+                    target = point;
+                    break;
+                } 
+            }
+
+            let mut reticle = meshes.last_mut().unwrap();
+            reticle.transform([target.x, target.y, target.z], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
             break;
         }
 

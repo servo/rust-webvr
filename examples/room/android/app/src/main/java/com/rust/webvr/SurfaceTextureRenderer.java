@@ -1,6 +1,8 @@
 package com.rust.webvr;
 
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
@@ -42,6 +44,7 @@ public class SurfaceTextureRenderer {
         if (mSurface != null) {
             try {
                 mSurfaceCanvas = mSurface.lockCanvas(null);
+                mSurfaceCanvas.drawColor( Color.TRANSPARENT, PorterDuff.Mode.CLEAR );
             }
             catch (Exception e){
                 e.printStackTrace();

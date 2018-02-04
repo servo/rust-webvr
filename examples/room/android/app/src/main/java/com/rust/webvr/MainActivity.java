@@ -8,7 +8,12 @@ import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.animation.Animation;
+import android.view.animation.LinearInterpolator;
+import android.view.animation.RotateAnimation;
+import android.webkit.WebView;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -23,7 +28,8 @@ import java.util.zip.ZipFile;
 public class MainActivity extends android.app.NativeActivity {
     private static final String LOGTAG = "WebVRExample";
     private FrameLayout mContentView;
-    private ArrayList<SurfaceTextureRenderer> mViews = new ArrayList();
+    private ArrayList<SurfaceTextureRenderer> mRenderers = new ArrayList();
+    private ArrayList<View> mViews = new ArrayList();
 
     static {
         //System.loadLibrary("gvr");
@@ -126,15 +132,28 @@ public class MainActivity extends android.app.NativeActivity {
     {
         SurfaceTextureRenderer renderer = new SurfaceTextureRenderer();
         renderer.initialize(width, height);
-        mViews.add(renderer);
+        mRenderers.add(renderer);
 
         this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                GLWebView view = new GLWebView(MainActivity.this);
+                View root = getLayoutInflater().inflate(R.layout.tab, null);
+                GLFrameLayout view = (GLFrameLayout)root.findViewById(R.id.container);
+                //GLWebView view = new GLWebView(MainActivity.this);
+                WebView webView = (WebView)root.findViewById(R.id.webview);
                 view.setRenderer(renderer);
-                mContentView.addView(view, new FrameLayout.LayoutParams(width, height));
-                view.loadUrl("http://www.marca.com");
+                mContentView.addView(root, new FrameLayout.LayoutParams(width, height));
+                webView.loadUrl("http://www.marca.com");
+                mViews.add(root);
+
+                RotateAnimation rotate = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+                rotate.setDuration(1000);
+                rotate.setRepeatCount(1000);
+                rotate.setInterpolator(new LinearInterpolator());
+
+                ImageButton image= (ImageButton) findViewById(R.id.reloadButton);
+
+                image.startAnimation(rotate);
             }
         });
 
@@ -145,8 +164,12 @@ public class MainActivity extends android.app.NativeActivity {
 
     private void updateSurfaceTextures()
     {
-        for (SurfaceTextureRenderer renderer: mViews) {
+        for (View view: mViews) {
+            view.postInvalidate();
+        }
+        for (SurfaceTextureRenderer renderer: mRenderers) {
             renderer.updateTexture();
         }
+
     }
 }

@@ -1,22 +1,28 @@
 package com.rust.webvr;
 
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.os.Build;
 import android.util.AttributeSet;
-import android.webkit.WebView;
+import android.widget.FrameLayout;
 
-public class GLWebView extends WebView {
+import com.rust.webvr.SurfaceTextureRenderer;
+
+
+public class GLFrameLayout extends FrameLayout {
     private SurfaceTextureRenderer mRenderer;
 
-    public GLWebView(Context context) {
+    // default constructors
+    public GLFrameLayout(Context context) {
         super(context);
     }
 
-    public GLWebView(Context context, AttributeSet attrs) {
+    public GLFrameLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
     }
 
-    public GLWebView(Context context, AttributeSet attrs, int defStyle) {
+    public GLFrameLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
     }
 
@@ -38,8 +44,8 @@ public class GLWebView extends WebView {
         mRenderer.drawEnd();
     }
 
-    public void setRenderer(SurfaceTextureRenderer viewTOGLRenderer){
+    public void setRenderer(SurfaceTextureRenderer viewTOGLRenderer) {
         mRenderer = viewTOGLRenderer;
+        setWillNotDraw(mRenderer == null);
     }
 }
-

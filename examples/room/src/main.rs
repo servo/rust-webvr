@@ -97,7 +97,7 @@ const FRAGMENT_SHADER_EXTERNAL: &'static str = r#"
     out vec4 color;
 
     void main() {
-        vec4 c = texture(sampler_ext, v_uv);
+        vec4 c = texture(sampler_ext, vec2(v_uv.x, 1.0 - v_uv.y));
         color = c;
         
     }
@@ -341,6 +341,74 @@ impl Mesh {
         }
     }
 
+    #[allow(dead_code)]
+    fn new_cylinder(gl: &Gl, tex: GLuint, radius: f32, length: f32, pos:[f32;3], rot:[f32;3]) -> Mesh {
+        let mut vertices = Vec::new();
+        let mut indices = Vec::new();
+
+        let num_steps = 20;
+        let hl = length * 0.5;
+        let mut a = 0f32;
+        let step = 2.0 * PI / num_steps as f32;
+
+        vertices.resize(num_steps * 2 + 2, Vertex::empty());
+
+        for i in 0..num_steps {
+            let x = a.cos() * radius;
+            let y = a.sin() * radius;
+            vertices[i] = Vertex { position: [x, y, hl], uv: [x.abs() / radius, y.abs() / radius] };
+            vertices[i + num_steps] = Vertex { position: [x, y, -hl], uv: [x.abs()/ radius, y.abs() / radius] };
+
+            a += step;
+        }
+        
+        vertices[num_steps * 2 + 0] = Vertex { position: [0.0, 0.0, hl], uv: [0.0, 1.0] };
+        vertices[num_steps * 2 + 1] = Vertex { position: [0.0, 0.0, -hl], uv: [0.0, 0.0] };
+
+        indices.resize(4 * num_steps * 3, 0);
+
+        for i in 0..num_steps {
+            let i1 = i as u16;
+            let i2 = (i1 + 1) % num_steps as u16;
+            let i3 = i1 + num_steps as u16;
+            let i4 = i2 + num_steps as u16;
+            
+            // Sides
+            indices[i * 6 + 0] = i1;
+            indices[i * 6 + 1] = i3;
+            indices[i * 6 + 2] = i2;
+            
+            indices[i * 6 + 3] = i4;
+            indices[i * 6 + 4] = i2;
+            indices[i * 6 + 5] = i3;
+            
+            // Caps
+            indices[num_steps * 6 + i * 6 + 0] = num_steps as u16 * 2;
+            indices[num_steps * 6 + i * 6 + 1] = i1;
+            indices[num_steps * 6 + i * 6 + 2] = i2;
+            
+            indices[num_steps * 6 + i * 6 + 3] = num_steps as u16 * 2 + 1;
+            indices[num_steps * 6 + i * 6 + 4] = i4;
+            indices[num_steps * 6 + i * 6 + 5] = i3;
+        }
+
+
+        let rotation = Matrix4::from(Euler { x: Rad(rot[0]), y: Rad(rot[1]), z: Rad(rot[2]) });
+        let translation = Matrix4::from_translation(Vec3::new(pos[0], pos[1], pos[2]));
+        let scale = Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
+        let matrix = translation * scale * rotation;
+
+        Mesh {
+            vertex_buffer: build_vertex_buffer(gl, &vertices),
+            index_buffer: build_indices_buffer(gl, &indices),
+            index_count: indices.len() as u32,
+            transform: matrix,
+            texture: tex,
+            external_texture: false
+        }
+    }
+
+
     fn new_quad(gl: &Gl, tex: GLuint) -> Mesh {
         let vertices = [
                 Vertex { position: [-1.0, -1.0, 0.0], uv: [0.0, 0.0] },
@@ -492,11 +560,14 @@ pub fn main() {
     gl.disable(gl::SCISSOR_TEST);
     gl.disable(gl::DEPTH_TEST);
     gl.disable(gl::STENCIL_TEST);
+    gl.enable(gl::BLEND);
+    gl.blend_func(gl::ONE, gl::ONE_MINUS_SRC_ALPHA);
 
     println!("Loading textures...");
     let floor_tex = build_texture(gl, "floor.jpg");
     let wall_tex = build_texture(gl, "wall.jpg");
     let sky_tex = build_texture(gl, "sky.jpg");
+    let reticle_tex = build_texture(gl, "reticle.png");
     println!("Textures loaded!");
 
     // texture to be used as a framebuffer
@@ -528,6 +599,10 @@ pub fn main() {
     meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0], false));
     meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0], false));
     meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [-1.0,1.0,1.0], false));
+
+    //let reticle = Mesh::new_plane(gl, reticle_tex, [0.2,0.2], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], false);
+    let reticle = Mesh::new_sphere(gl, reticle_tex, 0.1, [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0]);
+    meshes.push(reticle);
 
     let fbo_to_screen = Mesh::new_quad(gl, target_texture);
 
@@ -601,6 +676,15 @@ pub fn main() {
         }
 
         let data: VRFrameData = display.borrow().synced_frame_data(near, far);
+
+
+        let gamepads = vr.get_gamepads();
+        for gamepad in gamepads {
+            let gamepad = gamepad.borrow();
+            let state = gamepad.state();
+            let orientation = state.pose.orientation.unwrap();
+            break;
+        }
 
         let (left_view_matrix, right_view_matrix) = if test_pose {
              // Calculate view transform based on pose data
@@ -733,16 +817,6 @@ pub fn main() {
                     }
                 },
                 Ok(_) => {},
-            }
-        }
-
-        // debug controllers
-        if cfg!(debug) {
-            let gamepads = vr.get_gamepads();
-            for gamepad in gamepads {
-                let gamepad = gamepad.borrow();
-                println!("Gamepad Data: {:?}", gamepad.data());
-                println!("Gamepad State: {:?}", gamepad.state());
             }
         }
 

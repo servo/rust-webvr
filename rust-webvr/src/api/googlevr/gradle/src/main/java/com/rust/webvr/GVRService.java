@@ -72,6 +72,7 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
         // Show GvrLayout
         FrameLayout rootLayout = (FrameLayout)mActivity.findViewById(android.R.id.content);
         rootLayout.addView(gvrLayout, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        //rootLayout.addView(gvrLayout, new LayoutParams(500, 500));
 
         if (!mGvrResumed) {
             gvrLayout.onResume();

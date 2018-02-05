@@ -38,7 +38,7 @@ android {
     sourceSets {
         main {
             java.srcDirs = ['src/main/java']
-            assets.srcDirs = ['../../res']
+            assets.srcDirs = ['src/main/assets', '../../res']
         }
         armDebug {
             jniLibs.srcDirs = getJniLibsPath(true, 'arm')
@@ -121,6 +121,8 @@ task appStart(type: Exec, dependsOn: 'installArmRelease') {
 dependencies {
     daydreamCompile project(':GVRService')
     gearvrCompile project(':OVRService')
+    compile 'com.squareup.picasso:picasso:2.5.0'
+    compile 'com.android.support:appcompat-v7:25.4.0'
 }
 
 

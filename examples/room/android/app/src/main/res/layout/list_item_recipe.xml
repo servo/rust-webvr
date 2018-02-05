@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:tools="http://schemas.android.com/tools"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+  <ImageView
+      android:id="@+id/recipe_list_thumbnail"
+      android:layout_width="90dp"
+      android:layout_height="90dp"
+      android:layout_alignParentStart="true"
+      android:layout_centerVertical="true"
+      android:layout_marginBottom="6dp"
+      android:layout_marginStart="4dp"
+      android:layout_marginTop="6dp"
+      android:scaleType="centerInside"
+      tools:src="@mipmap/ic_launcher"
+      android:contentDescription="@string/thumbnail"/>
+
+  <TextView
+      android:id="@+id/recipe_list_detail"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_alignParentEnd="true"
+      android:layout_centerVertical="true"
+      android:layout_marginEnd="2dp"
+      android:layout_marginStart="4dp"
+      android:maxLines="1"
+      android:textColor="#000000"
+      android:textSize="12sp"
+      tools:text="Detail"
+      />
+
+  <RelativeLayout
+      android:id="@+id/recipe_list_text_layout"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_centerVertical="true"
+      android:layout_toEndOf="@id/recipe_list_thumbnail"
+      android:layout_toStartOf="@id/recipe_list_detail">
+
+    <TextView
+        android:id="@+id/recipe_list_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:layout_marginRight="8dp"
+        android:textSize="18sp"
+        tools:text="Title"
+        />
+
+    <TextView
+        android:id="@+id/recipe_list_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/recipe_list_title"
+        android:layout_marginLeft="8dp"
+        android:layout_marginRight="8dp"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:textSize="16sp"
+        tools:text="Subtitle"
+        />
+  </RelativeLayout>
+</RelativeLayout>

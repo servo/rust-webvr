@@ -1,8 +1,10 @@
 package com.rust.webvr;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.opengl.GLES20;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.text.InputType;
 import android.util.AttributeSet;
 import android.util.SparseArray;
 import android.view.MotionEvent;
@@ -16,8 +18,10 @@ import android.view.animation.LinearInterpolator;
 import android.view.animation.RotateAnimation;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.ListView;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -133,7 +137,7 @@ public class MainActivity extends android.app.NativeActivity {
         }
     }
 
-    private int createAndroidView(final int width, final int height)
+    private int createAndroidView(final int width, final int height, int tag)
     {
         SurfaceTextureRenderer renderer = new SurfaceTextureRenderer();
         renderer.initialize(width, height);
@@ -142,29 +146,18 @@ public class MainActivity extends android.app.NativeActivity {
         this.runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                View root = getLayoutInflater().inflate(R.layout.tab, null);
-                GLFrameLayout view = (GLFrameLayout)root.findViewById(R.id.container);
-                //GLWebView view = new GLWebView(MainActivity.this);
-                WebView webView = (WebView)root.findViewById(R.id.webview);
-                view.setRenderer(renderer);
-                mContentView.addView(root, new FrameLayout.LayoutParams(width, height));
-                webView.getSettings().setJavaScriptEnabled(true);
-                webView.setWebViewClient(new WebViewClient(){
-                    public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                        return false;
-                    }
-                });
-                webView.loadUrl("https://www.reddit.com");
-                mViews.append(renderer.textureId(), root);
+                View view = null;
+                if (tag == 0) {
+                    view = loadWebview(width, height);
+                }
+                else {
+                    view = loadRecipees(width, height);
+                }
 
-                RotateAnimation rotate = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
-                rotate.setDuration(1000);
-                rotate.setRepeatCount(1000);
-                rotate.setInterpolator(new LinearInterpolator());
+                ((GLFrameLayout)view).setRenderer(renderer);
 
-                ImageButton image= (ImageButton) findViewById(R.id.reloadButton);
-
-                image.startAnimation(rotate);
+                mContentView.addView(view, new FrameLayout.LayoutParams(width, height));
+                mViews.append(renderer.textureId(), view);
             }
         });
 
@@ -220,5 +213,56 @@ public class MainActivity extends android.app.NativeActivity {
             e.recycle();
         }
     }
+
+    private View loadWebview(int width, int height) {
+        View view = getLayoutInflater().inflate(R.layout.webview, null);
+
+        EditText urlBar = (EditText)view.findViewById(R.id.urlBar);
+        urlBar.setRawInputType(InputType.TYPE_CLASS_TEXT);
+        urlBar.setTextIsSelectable(true);
+
+        WebView webView = (WebView)view.findViewById(R.id.webview);
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.setWebViewClient(new WebViewClient(){
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return false;
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                urlBar.setText(url);
+
+            }
+        });
+        webView.loadUrl("https://www.reddit.com/r/food");
+
+        RotateAnimation rotate = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        rotate.setDuration(1000);
+        rotate.setFillAfter(true);
+        rotate.setRepeatCount(Animation.INFINITE);
+        rotate.setInterpolator(new LinearInterpolator());
+
+        ImageButton image= (ImageButton) view.findViewById(R.id.reloadButton);
+
+        image.startAnimation(rotate);
+
+        return view;
+    }
+
+    private View loadRecipees(int width, int height) {
+        View view = getLayoutInflater().inflate(R.layout.recipes, null);
+
+        // Get data to display
+        final ArrayList<Recipe> recipeList = Recipe.getRecipesFromFile("recipes.json", this);
+        // Create adapter
+        RecipeAdapter adapter = new RecipeAdapter(this, recipeList);
+
+        ListView list = (ListView) view.findViewById(R.id.recipe_list_view);
+        list.setAdapter(adapter);
+
+        return view;
+    }
+
 
 }

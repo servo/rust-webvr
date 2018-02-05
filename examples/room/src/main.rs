@@ -583,7 +583,7 @@ pub fn main() {
     let jni_env = jni_scope.env;
     let jni_activity_class = unsafe{ jni_scope.find_class("com/rust/webvr/MainActivity").unwrap() };
     let jni_activity = (jni.NewGlobalRef)(jni_env, jni_scope.activity);
-    let jni_create_view = unsafe { jni_scope.get_method(jni_activity_class, "createAndroidView", "(II)I", false) };
+    let jni_create_view = unsafe { jni_scope.get_method(jni_activity_class, "createAndroidView", "(III)I", false) };
     let jni_update_textures = unsafe { jni_scope.get_method(jni_activity_class, "updateSurfaceTextures", "()V", false) };
     let jni_map_input = unsafe { jni_scope.get_method(jni_activity_class, "mapInput", "(IIIZ)V", false) };
 
@@ -651,7 +651,8 @@ pub fn main() {
 
     let view_width = 1980.0;
     let view_size = Vec2::new(view_width, (view_width * height/width).ceil() as f32);
-    let view1: i32 = (jni.CallIntMethod)(jni_env, jni_activity, jni_create_view, view_size.x as i32, view_size.y as i32);
+    let view1: i32 = (jni.CallIntMethod)(jni_env, jni_activity, jni_create_view, view_size.x as i32, view_size.y as i32, 0);
+    let view2: i32 = (jni.CallIntMethod)(jni_env, jni_activity, jni_create_view, view_size.x as i32, view_size.y as i32, 1);
 
     let screen_fbo = gl.get_integer_v(gl::FRAMEBUFFER_BINDING) as u32;
     let screen_size = window.get_inner_size_pixels().unwrap();
@@ -696,10 +697,9 @@ pub fn main() {
     meshes.push(Mesh::new_plane(gl, floor_tex, [width,depth], [0.0, 0.0, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0], false, &mut input_planes));
     // walls
     meshes.push(Mesh::new_plane(gl, view1 as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], true, &mut input_planes));
-    //meshes.push(Mesh::new_plane(gl, wall_tex as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], false));
     meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
     meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
-    meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
+    meshes.push(Mesh::new_plane(gl, view2 as u32, [depth,height], [-width*0.5, height*0.5, 0.0], [0.0, -PI * 0.5, 0.0], [1.0,1.0,-1.0], true, &mut input_planes));
 
     //let reticle = Mesh::new_plane(gl, reticle_tex, [0.2,0.2], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], false);
     meshes.push(Mesh::new_sphere(gl, reticle_tex, 0.02, [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0]));
@@ -837,7 +837,7 @@ pub fn main() {
         if !direct_draw {
             // Render to texture
             gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
-            gl.clear_color(1.0, 0.0, 0.0, 1.0);
+            gl.clear_color(0.0, 0.0, 0.0, 1.0);
             gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
         }
 
@@ -876,7 +876,7 @@ pub fn main() {
             gl.scissor(viewport.0, viewport.1, viewport.2, viewport.3);
 
             if direct_draw {
-                gl.clear_color(1.0, 0.0, 0.0, 1.0);
+                gl.clear_color(0.0, 0.0, 0.0, 1.0);
                 gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
             }
 

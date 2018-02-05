@@ -2,7 +2,10 @@ package com.rust.webvr;
 import android.graphics.Color;
 import android.opengl.GLES20;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.AttributeSet;
+import android.util.SparseArray;
+import android.view.MotionEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -12,6 +15,7 @@ import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.RotateAnimation;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 
@@ -22,14 +26,15 @@ import java.io.IOException;
 import java.lang.System;
 import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class MainActivity extends android.app.NativeActivity {
     private static final String LOGTAG = "WebVRExample";
     private FrameLayout mContentView;
-    private ArrayList<SurfaceTextureRenderer> mRenderers = new ArrayList();
-    private ArrayList<View> mViews = new ArrayList();
+    private ArrayList<SurfaceTextureRenderer> mRenderers = new ArrayList<>();
+    private SparseArray<View> mViews = new SparseArray<>();
 
     static {
         //System.loadLibrary("gvr");
@@ -143,8 +148,14 @@ public class MainActivity extends android.app.NativeActivity {
                 WebView webView = (WebView)root.findViewById(R.id.webview);
                 view.setRenderer(renderer);
                 mContentView.addView(root, new FrameLayout.LayoutParams(width, height));
-                webView.loadUrl("http://www.marca.com");
-                mViews.add(root);
+                webView.getSettings().setJavaScriptEnabled(true);
+                webView.setWebViewClient(new WebViewClient(){
+                    public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                        return false;
+                    }
+                });
+                webView.loadUrl("https://www.reddit.com");
+                mViews.append(renderer.textureId(), root);
 
                 RotateAnimation rotate = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
                 rotate.setDuration(1000);
@@ -157,19 +168,57 @@ public class MainActivity extends android.app.NativeActivity {
             }
         });
 
-        int mortimer = renderer.textureId();
-
         return renderer.textureId();
     }
 
     private void updateSurfaceTextures()
     {
-        for (View view: mViews) {
+        for(int i = 0; i < mViews.size(); i++) {
+            View view = mViews.valueAt(i);
             view.postInvalidate();
         }
         for (SurfaceTextureRenderer renderer: mRenderers) {
             renderer.updateTexture();
         }
-
     }
+
+    private View mTouchingView = null;
+
+    private void mapInput(int id, int x, int y, boolean pressed) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                handleInput(id, x, y, pressed);
+            }
+        });
+    }
+
+    private void handleInput(int id, int x, int y, boolean pressed) {
+        View target = null;
+        int action = 0;
+
+        if (mTouchingView != null && !pressed) {
+            // Handle touchend
+            target = mTouchingView;
+            action = MotionEvent.ACTION_UP;
+            mTouchingView = null;
+        } else if (mTouchingView != null) {
+            // Handle touchmove
+            target = mTouchingView;
+            action = MotionEvent.ACTION_MOVE;
+        } else if (pressed) {
+            // Handle touch start
+            mTouchingView = mViews.get(id);
+            target = mTouchingView;
+            action = MotionEvent.ACTION_DOWN;
+        }
+
+        if (target != null) {
+            long ms = SystemClock.uptimeMillis();
+            MotionEvent e = MotionEvent.obtain(ms, ms, action, x, y, 0);
+            target.dispatchTouchEvent(e);
+            e.recycle();
+        }
+    }
+
 }

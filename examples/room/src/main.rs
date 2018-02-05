@@ -16,6 +16,7 @@ use std::{thread, time};
 use webvr::{VRServiceManager, VREvent, VRDisplayEvent, VRLayer, VRFrameData, VRFramebufferAttributes};
 use webvr::jni_utils::JNIScope;
 
+type Vec2 = Vector2<f32>;
 type Vec3 = Vector3<f32>;
 type Mat4 = Matrix4<f32>;
 
@@ -261,9 +262,9 @@ struct Plane {
 }
 
 impl Plane {
-    fn new(transform: &Mat4, size:[f32;2], view_id: Option<u32>) -> Plane {
-        let dx = size[0] * 0.5;
-        let dy = size[1] * 0.5;
+    fn new(transform: &Mat4, size:Vec2, view_id: Option<u32>) -> Plane {
+        let dx = size.x * 0.5;
+        let dy = size.y * 0.5;
         let s1 = transform * Vector4::new(-1.0 * dx, 1.0 * dy, 0.0, 1.0);
         let s2 = transform * Vector4::new( 1.0 * dx, 1.0 * dy, 0.0, 1.0);
         let s3 = transform * Vector4::new(-1.0 * dx, -1.0 * dy, 0.0, 1.0);
@@ -284,8 +285,6 @@ impl Plane {
             ::std::mem::swap(&mut s3, &mut s4);
         }
 
-        //println!("plane: {:?} {:?} {:?} {:?}", s1, s2, s3, s4);
-
         Plane {
             s1,
             s2,
@@ -295,7 +294,7 @@ impl Plane {
         }
     }
 
-    fn intersect(&self, origin: &Vec3, direction: &Vec3) -> Option<Vec3> {
+    fn intersect(&self, origin: &Vec3, direction: &Vec3) -> Option<(Vec3, Vec2)> {
         let r1 = origin;
         let r2 = origin + direction * 6.0;
 
@@ -308,14 +307,14 @@ impl Plane {
         let dr = r1 - r2;
         let ndr = n.dot(dr);
 
-        if ndr.abs() < 0.0000001 {
+        if ndr.abs() < 0.0000001 { // line contained in the plane
             return None;
         }
 
         let t = -n.dot(r1 - self.s1) / ndr;
         let m = r1 + dr * t;
 
-        // Check bounds
+        // Check quad bounds
         let dms1 = m - self.s1;
         let u = dms1.dot(ds21);
         let v = dms1.dot(ds31);
@@ -329,7 +328,7 @@ impl Plane {
         if target_dir.x.signum() == direction.x.signum()
            && target_dir.y.signum() == direction.y.signum()
            && target_dir.z.signum() == direction.z.signum() {
-            Some(m)
+            Some((m, Vec2::new(u / ds21.dot(ds21) , v / ds31.dot(ds31))))
         } else {
             None
         }
@@ -368,7 +367,7 @@ impl Mesh {
         let translation = Matrix4::from_translation(Vec3::new(pos[0], pos[1], pos[2]));
         let matrix =  translation * scale * rotation;
 
-        out.push(Plane::new(&matrix, size, if external_texture { Some(tex)} else { None } ));
+        out.push(Plane::new(&matrix, Vec2::new(size[0], size[1]), if external_texture { Some(tex)} else { None } ));
     
         Mesh {
             vertex_buffer: buffer,
@@ -586,6 +585,7 @@ pub fn main() {
     let jni_activity = (jni.NewGlobalRef)(jni_env, jni_scope.activity);
     let jni_create_view = unsafe { jni_scope.get_method(jni_activity_class, "createAndroidView", "(II)I", false) };
     let jni_update_textures = unsafe { jni_scope.get_method(jni_activity_class, "updateSurfaceTextures", "()V", false) };
+    let jni_map_input = unsafe { jni_scope.get_method(jni_activity_class, "mapInput", "(IIIZ)V", false) };
 
      // Initialize VR Services
     let mut vr = VRServiceManager::new();
@@ -649,7 +649,9 @@ pub fn main() {
     let gl = &*gl;
 
 
-    let mortimer: i32 = (jni.CallIntMethod)(jni_env, jni_activity, jni_create_view, 1024, 768);
+    let view_width = 1980.0;
+    let view_size = Vec2::new(view_width, (view_width * height/width).ceil() as f32);
+    let view1: i32 = (jni.CallIntMethod)(jni_env, jni_activity, jni_create_view, view_size.x as i32, view_size.y as i32);
 
     let screen_fbo = gl.get_integer_v(gl::FRAMEBUFFER_BINDING) as u32;
     let screen_size = window.get_inner_size_pixels().unwrap();
@@ -693,7 +695,7 @@ pub fn main() {
     // floor
     meshes.push(Mesh::new_plane(gl, floor_tex, [width,depth], [0.0, 0.0, 0.0], [-PI * 0.5, 0.0, 0.0], [1.0,1.0,1.0], false, &mut input_planes));
     // walls
-    meshes.push(Mesh::new_plane(gl, mortimer as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], true, &mut input_planes));
+    meshes.push(Mesh::new_plane(gl, view1 as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], true, &mut input_planes));
     //meshes.push(Mesh::new_plane(gl, wall_tex as u32, [width,height], [0.0, height*0.5, -depth * 0.5], [0.0, 0.0, 0.0], [1.0,1.0,1.0], false));
     meshes.push(Mesh::new_plane(gl, wall_tex, [width,height], [0.0, height*0.5, depth*0.5], [0.0, 0.0, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
     meshes.push(Mesh::new_plane(gl, wall_tex, [depth,height], [width*0.5, height*0.5, 0.0], [0.0, PI * 0.5, 0.0], [-1.0,1.0,1.0], false, &mut input_planes));
@@ -780,6 +782,7 @@ pub fn main() {
         for gamepad in gamepads {
             let gamepad = gamepad.borrow();
             let state = gamepad.state();
+            let pressed = state.buttons.first().unwrap().pressed;
             let gamepad_orientation = state.pose.orientation.unwrap();
             let gamepad_quaternion = vec_to_quaternion(&gamepad_orientation);
 
@@ -790,8 +793,14 @@ pub fn main() {
 
             // Input mapping raycast
             for plane in &input_planes {
-                if let Some(point) = plane.intersect(&orig, &direction) {
-                    target = point;
+                if let Some((world_point, uv_point)) = plane.intersect(&orig, &direction) {
+                    target = world_point;
+                    if let Some(view_id) = plane.view_id {
+                        let x = (uv_point.x * view_size.x) as i32;
+                        let y = (uv_point.y * view_size.y) as i32;
+                        (jni.CallVoidMethod)(jni_env, jni_activity, jni_map_input, view_id, x, y, pressed as i32);
+                    }
+
                     break;
                 } 
             }

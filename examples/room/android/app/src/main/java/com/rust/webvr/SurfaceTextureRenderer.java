@@ -62,7 +62,12 @@ public class SurfaceTextureRenderer {
 
     public void updateTexture() {
         if (mSurfaceTexture != null) {
-            mSurfaceTexture.updateTexImage();
+            try {
+                mSurfaceTexture.updateTexImage();
+            }
+            catch (Exception ex) {
+                ex.printStackTrace();
+            }
         }
     }
 

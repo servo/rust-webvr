@@ -1,6 +1,7 @@
 package com.rust.webvr;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.inputmethodservice.KeyboardView;
 import android.opengl.GLES20;
 import android.os.Bundle;
 import android.os.SystemClock;
@@ -237,7 +238,7 @@ public class MainActivity extends android.app.NativeActivity {
         });
         webView.loadUrl("https://www.reddit.com/r/food");
 
-        RotateAnimation rotate = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        /*RotateAnimation rotate = new RotateAnimation(0, 180, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
         rotate.setDuration(1000);
         rotate.setFillAfter(true);
         rotate.setRepeatCount(Animation.INFINITE);
@@ -245,7 +246,7 @@ public class MainActivity extends android.app.NativeActivity {
 
         ImageButton image= (ImageButton) view.findViewById(R.id.reloadButton);
 
-        image.startAnimation(rotate);
+        image.startAnimation(rotate);*/
 
         return view;
     }
@@ -260,6 +261,8 @@ public class MainActivity extends android.app.NativeActivity {
 
         ListView list = (ListView) view.findViewById(R.id.recipe_list_view);
         list.setAdapter(adapter);
+
+        KeyboardView keyboard = new KeyboardView(this);
 
         return view;
     }

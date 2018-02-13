@@ -3,8 +3,11 @@ package com.rust.webvr;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Rect;
 import android.os.Build;
 import android.util.AttributeSet;
+import android.view.View;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
 
 import com.rust.webvr.SurfaceTextureRenderer;
@@ -48,4 +51,11 @@ public class GLFrameLayout extends FrameLayout {
         mRenderer = viewTOGLRenderer;
         setWillNotDraw(mRenderer == null);
     }
+
+    @Override
+    public ViewParent invalidateChildInParent(int[] location, Rect dirty) {
+        return super.invalidateChildInParent(location, dirty);
+    }
+
+
 }

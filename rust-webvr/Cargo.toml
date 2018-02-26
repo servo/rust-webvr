@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.9.9"
+version = "0.9.10"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"
@@ -28,7 +28,7 @@ oculusvr = ["ovr-mobile-sys"]
 [dependencies]
 rust-webvr-api = "0.9.2" #{ path = "../rust-webvr-api" }
 log  = "0.4"
-libloading = { version = "0.4", optional = true, default-features = false }
+libloading = { version = "0.5", optional = true, default-features = false }
 gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }
 

@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.9.10"
+version = "0.9.11"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
 homepage = "https://github.com/MortimerGoro/rust-webvr"
@@ -33,4 +33,4 @@ gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }
 
 [build-dependencies]
-gl_generator = "0.9"
+gl_generator = "0.10"

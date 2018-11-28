@@ -38,7 +38,6 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
                     AndroidCompat.setSustainedPerformanceMode(activity, true);
                 }
                 gvrLayout.setPresentationView(new View(activity));
-                AndroidCompat.setVrModeEnabled(activity, true);
 
                 activity.getApplication().registerActivityLifecycleCallbacks(GVRService.this);
 
@@ -69,6 +68,9 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
         if (mPresenting) {
             return;
         }
+
+        AndroidCompat.setVrModeEnabled(mActivity, true);
+
         // Show GvrLayout
         FrameLayout rootLayout = (FrameLayout)mActivity.findViewById(android.R.id.content);
         rootLayout.addView(gvrLayout, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
@@ -102,6 +104,8 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
                 // Hide GvrLayout
                 FrameLayout rootLayout = (FrameLayout)mActivity.findViewById(android.R.id.content);
                 rootLayout.removeView(gvrLayout);
+
+                AndroidCompat.setVrModeEnabled(mActivity, false);
             }
         });
     }

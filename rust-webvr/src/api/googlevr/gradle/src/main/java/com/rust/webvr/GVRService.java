@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.FrameLayout.LayoutParams;
 
@@ -71,6 +72,7 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
         }
 
         mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        mActivity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
         AndroidCompat.setVrModeEnabled(mActivity, true);
 
         // Show GvrLayout
@@ -108,7 +110,8 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
                 rootLayout.removeView(gvrLayout);
 
                 AndroidCompat.setVrModeEnabled(mActivity, false);
-                mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
+                mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER);
+                mActivity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
             }
         });
     }

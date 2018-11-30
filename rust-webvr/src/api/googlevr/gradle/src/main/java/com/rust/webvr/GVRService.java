@@ -2,6 +2,7 @@ package com.rust.webvr;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -69,6 +70,7 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
             return;
         }
 
+        mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         AndroidCompat.setVrModeEnabled(mActivity, true);
 
         // Show GvrLayout
@@ -106,6 +108,7 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
                 rootLayout.removeView(gvrLayout);
 
                 AndroidCompat.setVrModeEnabled(mActivity, false);
+                mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_USER_PORTRAIT);
             }
         });
     }

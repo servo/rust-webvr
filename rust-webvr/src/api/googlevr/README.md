@@ -7,3 +7,5 @@ This can be done by:
  - Setting the build variant to `release` (View -> Tool Windows -> Build Variants)
  - Running a build (Make Project, Ctrl-F9)
  - Copying `gradle/build/outputs/aar/GVRService.aar` to `aar/GVRService.aar` and checking it in
+
+The build can also be run standalone via `./gradleW assembleRelease`

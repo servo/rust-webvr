@@ -78,7 +78,7 @@ impl VRDisplay for GoogleVRDisplay {
         data
     }
 
-    fn inmediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
+    fn immediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
         unsafe {
             let time = gvr::gvr_get_time_point_now();

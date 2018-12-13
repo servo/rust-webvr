@@ -70,7 +70,7 @@ impl VRDisplay for MockVRDisplay {
         data
     }
 
-    fn inmediate_frame_data(&self, _near_z: f64, _far_z: f64) -> VRFrameData {
+    fn immediate_frame_data(&self, _near_z: f64, _far_z: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
         // Position vector
         data.pose.position = Some([0.5, -0.7, -0.3]);
@@ -105,7 +105,7 @@ impl VRDisplay for MockVRDisplay {
     }
 
     fn synced_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
-        self.inmediate_frame_data(near_z, far_z)
+        self.immediate_frame_data(near_z, far_z)
     }
 
     fn reset_pose(&mut self) {

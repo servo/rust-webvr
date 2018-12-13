@@ -12,9 +12,9 @@ pub trait VRDisplay: Send + Sync {
     // Returns the current display data.
     fn data(&self) -> VRDisplayData;
 
-    // Returns the inmediate VRFrameData of the HMD
+    // Returns the immediate VRFrameData of the HMD
     // Shpuld be used when not presenting to the device.
-    fn inmediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData;
+    fn immediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData;
 
     // Returns the synced VRFrameData to render the current frame.
     // Should be used when presenting to the device.

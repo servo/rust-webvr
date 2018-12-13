@@ -87,7 +87,7 @@ impl VRDisplay for OpenVRDisplay {
         data
     }
 
-    fn inmediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
+    fn immediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
 
         let mut tracked_poses: [openvr::TrackedDevicePose_t; openvr::k_unMaxTrackedDeviceCount as usize]
@@ -108,8 +108,8 @@ impl VRDisplay for OpenVRDisplay {
 
      fn synced_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
          if self.compositor == ptr::null_mut() {
-             // Fallback to inmediate mode if compositor not available
-             self.inmediate_frame_data(near_z, far_z);
+             // Fallback to immediate mode if compositor not available
+             self.immediate_frame_data(near_z, far_z);
          }
 
          let mut display_pose: openvr::TrackedDevicePose_t = unsafe { mem::uninitialized() };

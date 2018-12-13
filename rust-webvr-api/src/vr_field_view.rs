@@ -1,5 +1,5 @@
-// The VRFieldOfView interface represents a field of view, 
-// as given by 4 degrees describing the view from a center point.
+/// The VRFieldOfView interface represents a field of view, 
+/// as given by 4 degrees describing the view from a center point.
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]

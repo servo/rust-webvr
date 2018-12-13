@@ -1,20 +1,20 @@
-// Data provided to a VRDisplay and presented in the HMD.
+/// Data provided to a VRDisplay and presented in the HMD.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRLayer {
-    // Source texture whose contents will be presented by the 
-    // VRDisplay when VRDisplay.submitFrame() is called.
+    /// Source texture whose contents will be presented by the 
+    /// VRDisplay when VRDisplay.submitFrame() is called.
     pub texture_id: u32,
 
-    // UVs defining the texture bounds to present to the eye in UV space: [x,y,w,h]
-    // Defaults to [0.0, 0.0, 0.5, 1.0]
+    /// UVs defining the texture bounds to present to the eye in UV space: [x,y,w,h]
+    /// Defaults to [0.0, 0.0, 0.5, 1.0]
     pub left_bounds: [f32; 4],
 
-    // UVs defining the texture bounds to present to the eye in UV space: [x,y,w,h]
-    // Defaults to [0.5, 0.0, 0.5, 1.0]
+    /// UVs defining the texture bounds to present to the eye in UV space: [x,y,w,h]
+    /// Defaults to [0.5, 0.0, 0.5, 1.0]
     pub right_bounds: [f32; 4],
 
-    // Hint with texture size
+    /// Hint with texture size
     pub texture_size: Option<(u32, u32)>,
 }
 

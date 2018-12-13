@@ -11,48 +11,48 @@ pub enum VREvent {
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub enum VRDisplayEventReason {
     Navigation,
-    // The VRDisplay has detected that the user has put it on.
+    /// The VRDisplay has detected that the user has put it on.
     Mounted,
 
-    // The VRDisplay has detected that the user has taken it off.
+    /// The VRDisplay has detected that the user has taken it off.
     Unmounted
 }
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub enum VRDisplayEvent {
-    // Indicates that a VRDisplay has been connected.
+    /// Indicates that a VRDisplay has been connected.
     Connect(VRDisplayData),
 
-    // Indicates that a VRDisplay has been disconnected.
-    // param: display_id
+    /// Indicates that a VRDisplay has been disconnected.
+    /// param: display_id
     Disconnect(u32),
 
-    // Indicates that something has occured which suggests the VRDisplay should be presented to
+    /// Indicates that something has occured which suggests the VRDisplay should be presented to
     Activate(VRDisplayData, VRDisplayEventReason),
 
-    // Indicates that something has occured which suggests the VRDisplay should exit presentation
+    /// Indicates that something has occured which suggests the VRDisplay should exit presentation
     Deactivate(VRDisplayData, VRDisplayEventReason),
 
-    // Indicates that some of the VRDisplay's data has changed (eye parameters, tracking data, chaperone, ipd, etc.)
+    /// Indicates that some of the VRDisplay's data has changed (eye parameters, tracking data, chaperone, ipd, etc.)
     Change(VRDisplayData),
 
-    // Indicates that presentation to the display by the page is paused by the user agent, OS, or VR hardware
+    /// Indicates that presentation to the display by the page is paused by the user agent, OS, or VR hardware
     Blur(VRDisplayData),
 
-    // Indicates that presentation to the display by the page has resumed after being blurred.
+    /// Indicates that presentation to the display by the page has resumed after being blurred.
     Focus(VRDisplayData),
 
-    // Indicates that a VRDisplay has begun or ended VR presentation
+    /// Indicates that a VRDisplay has begun or ended VR presentation
     PresentChange(VRDisplayData, bool),
 
-    // Indicates that VRDisplay presentation loop must be paused (i.e Android app goes to background)
+    /// Indicates that VRDisplay presentation loop must be paused (i.e Android app goes to background)
     Pause(u32),
 
-    // Indicates that VRDisplay presentation loop must be resumed (i.e Android app goes to foreground)
+    /// Indicates that VRDisplay presentation loop must be resumed (i.e Android app goes to foreground)
     Resume(u32),
 
-    // Indicates that user has exited VRDisplay presentation (i.e. User clicked back key on android)
+    /// Indicates that user has exited VRDisplay presentation (i.e. User clicked back key on android)
     Exit(u32)
 }
 
@@ -66,12 +66,12 @@ impl Into<VREvent> for VRDisplayEvent {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub enum VRGamepadEvent {
-    // Indicates that a VRGamepad has been connected.
-    // params: name, displa_id, state
+    /// Indicates that a VRGamepad has been connected.
+    /// params: name, displa_id, state
     Connect(VRGamepadData, VRGamepadState),
 
-    // Indicates that a VRGamepad has been disconnected.
-    // param: gamepad_id
+    /// Indicates that a VRGamepad has been disconnected.
+    /// param: gamepad_id
     Disconnect(u32)
 }
 

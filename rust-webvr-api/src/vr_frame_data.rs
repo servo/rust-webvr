@@ -2,28 +2,28 @@ use VRPose;
 use std::mem;
 use std::ptr;
 
-// Represents all the information needed to render a single frame of a VR scene
+/// Represents all the information needed to render a single frame of a VR scene
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 pub struct VRFrameData {
-    // Monotonically increasing value that allows the author 
-    // to determine if position state data been updated from the hardware
+    /// Monotonically increasing value that allows the author 
+    /// to determine if position state data been updated from the hardware
     pub timestamp: f64,
 
-    // major order column matrix describing the projection to be used for the left eye’s rendering
+    /// major order column matrix describing the projection to be used for the left eye’s rendering
     pub left_projection_matrix: [f32; 16],
 
-    // major order column matrix describing the view transform to be used for the left eye’s rendering
+    /// major order column matrix describing the view transform to be used for the left eye’s rendering
     pub left_view_matrix: [f32; 16],
 
-    // major order column matrix describing the projection to be used for the right eye’s rendering
+    /// major order column matrix describing the projection to be used for the right eye’s rendering
     pub right_projection_matrix: [f32; 16],
 
-    // major order column matrix describing the view transform to be used for the right eye’s rendering
+    /// major order column matrix describing the view transform to be used for the right eye’s rendering
     pub right_view_matrix: [f32; 16],
  
-    // VRPose containing the future predicted pose of the VRDisplay
-    // when the current frame will be presented.
+    /// VRPose containing the future predicted pose of the VRDisplay
+    /// when the current frame will be presented.
     pub pose: VRPose,
 }
 

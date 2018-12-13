@@ -86,7 +86,7 @@ impl VRDisplay for OculusVRDisplay {
         data
     }
 
-    fn inmediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
+    fn immediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
         let mut data = VRFrameData::default();
 
         if !self.activity_paused && self.is_in_vr_mode() {

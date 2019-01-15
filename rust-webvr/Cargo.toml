@@ -1,12 +1,12 @@
 [package]
 name = "rust-webvr"
 version = "0.9.12"
-authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
+authors = ["The Servo Project Developers"]
 
 homepage = "https://github.com/servo/rust-webvr"
 repository = "https://github.com/servo/rust-webvr"
 keywords = ["webvr", "openvr", "oculus", "headset", "vr"]
-license = "MIT"
+license = "MPL-2.0"
 
 description = '''Safe rust API that provides a way to interact with Virtual Reality headsets 
 and integration with vendor specific SDKs like OpenVR and Oculus. The API is inspired on the 

@@ -8,4 +8,6 @@ build/
 *.iml
 local.properties
 
+*~
+
 examples/room/android/captures/

@@ -3,8 +3,8 @@ name = "rust-webvr-api"
 version = "0.9.2"
 authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 
-homepage = "https://github.com/MortimerGoro/rust-webvr"
-repository = "https://github.com/MortimerGoro/rust-webvr"
+homepage = "https://github.com/servo/rust-webvr"
+repository = "https://github.com/servo/rust-webvr"
 keywords = ["webvr", "openvr", "oculus", "headset", "vr"]
 license = "MIT"
 

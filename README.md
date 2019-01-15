@@ -8,7 +8,7 @@ It's used in the WebVR Core implementation for Servo browser. This module can be
 Just run this command in examples/room folder
 
 ```
-cargo run --example room
+cargo run
 ```
 
 Run room scale demo on android:

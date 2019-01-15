@@ -4,6 +4,7 @@ extern crate android_injected_glue;
 extern crate gleam;
 use gleam::gl::{self, Gl, GLenum, GLint, GLuint};
 extern crate glutin;
+use glutin::{Event, GlContext, WindowEvent};
 extern crate cgmath;
 extern crate image;
 use self::cgmath::*;
@@ -431,8 +432,9 @@ pub fn main() {
 
     let render_width = display_data.left_eye_parameters.render_width;
     let render_height = display_data.left_eye_parameters.render_height;
-    let window_width = render_width;
-    let window_height = (render_height as f32 * 0.5) as u32;
+    let window_width = render_width as f64;
+    let window_height = (render_height as f64) * 0.5;
+    let window_dimensions = glutin::dpi::LogicalSize::new(window_width, window_height);
 
     let near = 0.1f64;
     let far = 150.0f64;
@@ -451,9 +453,11 @@ pub fn main() {
         panic!("Configuration not supported: Multiview must use direct_draw.");
     }
 
-    let window = glutin::WindowBuilder::new().with_dimensions(window_width, window_height) //.with_vsync()
-                                             .with_gl(gl_version())
-                                             .build().unwrap();
+    let mut events_loop = glutin::EventsLoop::new();
+    let window_builder = glutin::WindowBuilder::new().with_dimensions(window_dimensions);
+    let context = glutin::ContextBuilder::new().with_gl(gl_version());
+    let window = glutin::GlWindow::new(window_builder, context, &events_loop).unwrap();
+
     unsafe {
         window.make_current().unwrap();
     }
@@ -465,7 +469,8 @@ pub fn main() {
 
 
     let screen_fbo = gl.get_integer_v(gl::FRAMEBUFFER_BINDING) as u32;
-    let screen_size = window.get_inner_size_pixels().unwrap();
+    let screen_dpi = window.get_hidpi_factor();
+    let screen_size = window.get_inner_size().unwrap().to_physical(screen_dpi);
     let vao = gl.gen_vertex_arrays(1)[0];
     gl.bind_vertex_array(vao);
     gl.disable(gl::SCISSOR_TEST);
@@ -557,8 +562,9 @@ pub fn main() {
 
 
     let mut event_counter = 0u64;
+    let mut running = true;
 
-    loop {
+    while running {
         display.borrow_mut().sync_poses();
 
         let display_data = display.borrow().data();
@@ -672,8 +678,8 @@ pub fn main() {
         gl.bind_framebuffer(gl::FRAMEBUFFER, screen_fbo);
         gl.clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT | gl::STENCIL_BUFFER_BIT);
         gl.use_program(prog_fb.id);
-        gl.viewport(0, 0, screen_size.0 as i32, screen_size.1 as i32);
-        gl.scissor(0, 0, screen_size.0 as i32, screen_size.1 as i32);
+        gl.viewport(0, 0, screen_size.width as i32, screen_size.height as i32);
+        gl.scissor(0, 0, screen_size.width as i32, screen_size.height as i32);
         gl.uniform_matrix_4fv(prog_fb.loc("matrix"), false, matrix_to_uniform(&fbo_to_screen.transform));
         gl.active_texture(gl::TEXTURE0);
         gl.uniform_1i(prog_fb.loc("sampler"), 0);
@@ -731,12 +737,13 @@ pub fn main() {
         }
 
         // Window Events
-        for event in window.poll_events() {
+        events_loop.poll_events(|event| {
             match event {
-                glutin::Event::Closed => return,
-                _ => {}
+                Event::WindowEvent{ event: WindowEvent::CloseRequested, .. } |
+                Event::WindowEvent{ event: WindowEvent::Destroyed, .. } => running = false,
+                _ => (),
             }
-        }
+        })
     }
 }
 

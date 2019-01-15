@@ -5,7 +5,7 @@ authors = ["Imanol Fernandez <mortimergoro@gmail.com>"]
 build = "build.rs"
 
 [dependencies]
-glutin = { git = "https://github.com/MortimerGoro/glutin/", branch  = "android_fixes" }
+glutin = "0.19"
 gleam = "0.4"
 cgmath = "0.12"
 image = "0.12"

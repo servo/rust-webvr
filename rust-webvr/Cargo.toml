@@ -19,7 +19,8 @@ exclude = [
 build = "build.rs"
 
 [features]
-default = ["openvr", "mock"]
+default = ["vrexternal", "openvr", "mock"]
+vrexternal = []
 openvr = ["libloading"]
 mock = []
 googlevr = ["gvr-sys"]
@@ -31,6 +32,8 @@ log  = "0.4"
 libloading = { version = "0.5", optional = true, default-features = false }
 gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }
+libc = "0.2"
 
 [build-dependencies]
 gl_generator = "0.10"
+bindgen = "0.46"

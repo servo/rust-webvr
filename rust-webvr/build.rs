@@ -1,8 +1,9 @@
+extern crate bindgen;
 extern crate gl_generator;
 
 use std::env;
 use std::fs::{self, File};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use gl_generator::{Registry, Api, Profile, Fallbacks};
 
 fn main() {
@@ -15,7 +16,7 @@ fn main() {
                  &Path::new(&aar_out_dir).join("OVRService.aar")).unwrap();
     }
 
-    if !cfg!(feature = "googlevr") && !cfg!(feature = "oculusvr")  {
+    if !cfg!(feature = "googlevr") && !cfg!(feature = "oculusvr") && !cfg!(feature = "vrexternal") {
         return;
     }
 
@@ -35,4 +36,31 @@ fn main() {
             .write_bindings(gl_generator::StaticGenerator, &mut file).unwrap();
         println!("cargo:rustc-link-lib=EGL");
     }
+
+    if cfg!(feature = "vrexternal") {
+        let mut builder = bindgen::Builder::default()
+            .header("src/api/vrexternal/cpp/moz_external_vr.h")
+            .clang_args(&["-x", "c++"])
+            .whitelist_type("mozilla::gfx::VRExternalShmem")
+            .disable_name_namespacing()
+            .rustfmt_bindings(true);
+
+        if let Ok(flags) = env::var("CXXFLAGS") {
+            for flag in flags.split_whitespace() {
+                builder = builder.clang_arg(flag);
+            }
+        }
+
+        if let Ok(flags) = env::var("CLANGFLAGS") {
+            for flag in flags.split_whitespace() {
+                builder = builder.clang_arg(flag);
+            }
+        }
+
+        let bindings = builder.generate().expect("Unable to generate bindings");
+        let out_path = PathBuf::from(&out_dir);
+        bindings.write_to_file(out_path.join("moz_external_vr.rs"))
+            .expect("Couldn't write bindings!");
+    }
+
 }

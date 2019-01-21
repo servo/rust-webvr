@@ -1,3 +1,8 @@
+#[cfg(feature = "vrexternal")]
+mod vrexternal;
+#[cfg(feature = "vrexternal")]
+pub use self::vrexternal::{VRExternalServiceCreator, VRExternalShmemPtr};
+
 #[cfg(feature = "mock")]
 mod mock;
 #[cfg(feature = "mock")]

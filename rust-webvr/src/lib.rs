@@ -1,3 +1,4 @@
+extern crate libc;
 extern crate rust_webvr_api;
 #[cfg(all(feature = "googlevr", target_os= "android"))]
 extern crate gvr_sys;

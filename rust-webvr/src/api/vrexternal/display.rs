@@ -106,7 +106,7 @@ impl VRDisplay for VRExternalDisplay {
         data
     }
 
-    fn immediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
+    fn inmediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
         let sys = &self.system_state;
 
         let mut data = VRFrameData::default();
@@ -155,7 +155,7 @@ impl VRDisplay for VRExternalDisplay {
     }
 
     fn synced_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData {
-        self.immediate_frame_data(near_z, far_z)
+        self.inmediate_frame_data(near_z, far_z)
     }
 
     fn reset_pose(&mut self) {

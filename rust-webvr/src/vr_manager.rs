@@ -20,6 +20,7 @@ use api::OculusVRServiceCreator;
 #[cfg(feature = "mock")]
 use api::MockServiceCreator;
 
+#[cfg(target_os = "android")]
 #[cfg(feature = "vrexternal")]
 use api::{VRExternalServiceCreator, VRExternalShmemPtr};
 
@@ -69,6 +70,7 @@ impl VRServiceManager {
     }
 
     // Register VRExternal service.
+    #[cfg(target_os = "android")]
     #[cfg(feature = "vrexternal")]
     pub fn register_vrexternal(&mut self, ptr: VRExternalShmemPtr) {
         let creator = VRExternalServiceCreator::new(ptr);

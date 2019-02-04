@@ -1,7 +1,9 @@
-#[cfg(all(feature = "vrexternal", target_os= "android"))]
+#[cfg(feature = "vrexternal")]
 mod vrexternal;
+#[cfg(feature = "vrexternal")]
+pub use self::vrexternal::VRExternalShmemPtr;
 #[cfg(all(feature = "vrexternal", target_os= "android"))]
-pub use self::vrexternal::{VRExternalServiceCreator, VRExternalShmemPtr};
+pub use self::vrexternal::VRExternalServiceCreator;
 
 #[cfg(feature = "mock")]
 mod mock;

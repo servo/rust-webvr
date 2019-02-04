@@ -1,3 +1,4 @@
+#[cfg(all(feature = "vrexternal", target_os= "android"))]
 extern crate libc;
 extern crate rust_webvr_api;
 #[cfg(all(feature = "googlevr", target_os= "android"))]

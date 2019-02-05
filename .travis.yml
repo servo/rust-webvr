@@ -2,5 +2,3 @@ language: rust
 script:
   - cd webvr
   - cargo build --features=googlevr,oculusvr
-  - rustup target add i686-linux-android
-  - cargo build --target=i686-linux-android

@@ -37,10 +37,11 @@ fn main() {
         println!("cargo:rustc-link-lib=EGL");
     }
 
-    if cfg!(feature = "vrexternal") {
+    let target = env::var("TARGET").unwrap();
+    if target.contains("android") && cfg!(feature = "vrexternal") {
         let mut builder = bindgen::Builder::default()
             .header("src/api/vrexternal/cpp/moz_external_vr.h")
-            .clang_args(&["-x", "c++"])
+            .clang_args(&["-x", "c++", "-std=gnu++11"])
             .whitelist_type("mozilla::gfx::VRExternalShmem")
             .disable_name_namespacing()
             .rustfmt_bindings(true);

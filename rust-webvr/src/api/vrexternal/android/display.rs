@@ -57,11 +57,11 @@ impl VRDisplay for VRExternalDisplay {
         let mut data = VRDisplayData::default();
 
         let state: &mozgfx::VRDisplayState = &self.system_state.displayState;
-        data.display_name = state.mDisplayName.iter().map(|x| *x as char).collect();
+        data.display_name = state.displayName.iter().map(|x| *x as u8 as char).collect();
         data.display_id = self.display_id;
-        data.connected = state.mIsConnected;
+        data.connected = state.isConnected;
 
-        let flags = state.mCapabilityFlags;
+        let flags = state.capabilityFlags;
         data.capabilities.has_position =
             (flags & mozgfx::VRDisplayCapabilityFlags_Cap_Position) != 0;
         data.capabilities.can_present = (flags & mozgfx::VRDisplayCapabilityFlags_Cap_Present) != 0;
@@ -73,25 +73,25 @@ impl VRDisplay for VRExternalDisplay {
         data.stage_parameters = None;
 
         data.left_eye_parameters.offset = [
-            state.mEyeTranslation[0].x,
-            state.mEyeTranslation[0].y,
-            state.mEyeTranslation[0].z,
+            state.eyeTranslation[0].x,
+            state.eyeTranslation[0].y,
+            state.eyeTranslation[0].z,
         ];
 
-        data.left_eye_parameters.render_width = state.mEyeResolution.width as u32;
-        data.left_eye_parameters.render_height = state.mEyeResolution.height as u32;
+        data.left_eye_parameters.render_width = state.eyeResolution.width as u32;
+        data.left_eye_parameters.render_height = state.eyeResolution.height as u32;
 
         data.right_eye_parameters.offset = [
-            state.mEyeTranslation[1].x,
-            state.mEyeTranslation[1].y,
-            state.mEyeTranslation[1].z,
+            state.eyeTranslation[1].x,
+            state.eyeTranslation[1].y,
+            state.eyeTranslation[1].z,
         ];
 
-        data.right_eye_parameters.render_width = state.mEyeResolution.width as u32;
-        data.right_eye_parameters.render_height = state.mEyeResolution.height as u32;
+        data.right_eye_parameters.render_width = state.eyeResolution.width as u32;
+        data.right_eye_parameters.render_height = state.eyeResolution.height as u32;
 
-        let l_fov = state.mEyeFOV[mozgfx::VRDisplayState_Eye_Eye_Left as usize];
-        let r_fov = state.mEyeFOV[mozgfx::VRDisplayState_Eye_Eye_Right as usize];
+        let l_fov = state.eyeFOV[mozgfx::VRDisplayState_Eye_Eye_Left as usize];
+        let r_fov = state.eyeFOV[mozgfx::VRDisplayState_Eye_Eye_Right as usize];
 
         data.left_eye_parameters.field_of_view.up_degrees = l_fov.upDegrees;
         data.left_eye_parameters.field_of_view.right_degrees = l_fov.rightDegrees;
@@ -142,9 +142,9 @@ impl VRDisplay for VRExternalDisplay {
         };
 
         let left_fov =
-            sys.displayState.mEyeFOV[mozgfx::VRDisplayState_Eye_Eye_Left as usize];
+            sys.displayState.eyeFOV[mozgfx::VRDisplayState_Eye_Eye_Left as usize];
         let right_fov =
-            sys.displayState.mEyeFOV[mozgfx::VRDisplayState_Eye_Eye_Right as usize];
+            sys.displayState.eyeFOV[mozgfx::VRDisplayState_Eye_Eye_Right as usize];
 
         data.left_projection_matrix = proj(left_fov);
         data.right_projection_matrix = proj(right_fov);
@@ -166,14 +166,14 @@ impl VRDisplay for VRExternalDisplay {
             self.start_present(None);
         }
 
-        let last_frame_id = self.system_state.displayState.mLastSubmittedFrameId;
-        let last_pres_gen = self.system_state.displayState.mPresentingGeneration;
+        let last_frame_id = self.system_state.displayState.lastSubmittedFrameId;
+        let last_pres_gen = self.system_state.displayState.presentingGeneration;
         let sys = self.shmem.as_mut().pull_system(&|sys| {
-            sys.displayState.mLastSubmittedFrameId >= last_frame_id ||
-                sys.displayState.mSuppressFrames ||
-                !sys.displayState.mIsConnected
+            sys.displayState.lastSubmittedFrameId >= last_frame_id ||
+                sys.displayState.suppressFrames ||
+                !sys.displayState.isConnected
         });
-        if sys.displayState.mPresentingGeneration != last_pres_gen {
+        if sys.displayState.presentingGeneration != last_pres_gen {
             self.events.push(VRDisplayEvent::Exit(0));
         } else {
             self.system_state = sys;
@@ -209,24 +209,24 @@ impl VRDisplay for VRExternalDisplay {
         let layer_stereo_immersive = {
             let rendered_layer = self.rendered_layer.as_ref().unwrap();
             mozgfx::VRLayer_Stereo_Immersive {
-                mTextureHandle: rendered_layer.texture_id as u64,
-                mTextureType: mozgfx::VRLayerTextureType_LayerTextureType_GeckoSurfaceTexture,
-                mFrameId: self.system_state.sensorState.inputFrameID,
-                mLeftEyeRect: mozgfx::VRLayerEyeRect {
+                textureHandle: rendered_layer.texture_id as u64,
+                textureType: mozgfx::VRLayerTextureType_LayerTextureType_GeckoSurfaceTexture,
+                frameId: self.system_state.sensorState.inputFrameID,
+                leftEyeRect: mozgfx::VRLayerEyeRect {
                     x: rendered_layer.left_bounds[0],
                     y: rendered_layer.left_bounds[1],
                     width: rendered_layer.left_bounds[2],
                     height: rendered_layer.left_bounds[3],
                 },
-                mRightEyeRect: mozgfx::VRLayerEyeRect {
+                rightEyeRect: mozgfx::VRLayerEyeRect {
                     x: rendered_layer.right_bounds[0],
                     y: rendered_layer.right_bounds[1],
                     width: rendered_layer.right_bounds[2],
                     height: rendered_layer.right_bounds[3],
                 },
-                mInputFrameId: 0,
+                inputFrameId: 0,
                 ..mozgfx::VRLayer_Stereo_Immersive::default()
-            }
+           }
         };
 
         let layer = mozgfx::VRLayerState {

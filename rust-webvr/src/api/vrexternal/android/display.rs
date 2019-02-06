@@ -224,17 +224,17 @@ impl VRDisplay for VRExternalDisplay {
                     width: rendered_layer.right_bounds[2],
                     height: rendered_layer.right_bounds[3],
                 },
-                __bindgen_padding_0: 0,
                 mInputFrameId: 0,
+                ..mozgfx::VRLayer_Stereo_Immersive::default()
             }
         };
 
         let layer = mozgfx::VRLayerState {
             type_: mozgfx::VRLayerType_LayerType_Stereo_Immersive,
-            __bindgen_padding_0: 0,
             __bindgen_anon_1: mozgfx::VRLayerState__bindgen_ty_1 {
                 layer_stereo_immersive,
             },
+            ..mozgfx::VRLayerState::default()
         };
 
         self.browser_state.layerState[0] = layer;

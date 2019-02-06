@@ -44,6 +44,7 @@ fn main() {
             .clang_args(&["-x", "c++", "-std=gnu++11"])
             .whitelist_type("mozilla::gfx::VRExternalShmem")
             .disable_name_namespacing()
+            .derive_default(true)
             .rustfmt_bindings(true);
 
         if let Ok(flags) = env::var("CXXFLAGS") {

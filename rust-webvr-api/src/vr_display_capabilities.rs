@@ -14,6 +14,9 @@ pub struct VRDisplayCapabilities {
     /// true if the VRDisplay is capable of presenting content to an HMD or similar device.
     pub can_present: bool,
 
+    /// true if the VR display expects the browser to present the content.
+    pub presented_by_browser: bool,
+
     /// Indicates the maximum length of the array that requestPresent() will accept,
     /// Must be 1 if canPresent is true, 0 otherwise.
     pub max_layers: u64
@@ -26,6 +29,7 @@ impl Default for VRDisplayCapabilities {
             has_orientation: false,
             has_external_display: false,
             can_present: false,
+            presented_by_browser: false,
             max_layers: 0
         }
     }

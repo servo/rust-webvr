@@ -1,11 +1,11 @@
 #[cfg(feature = "utils")]
 
 use std::mem;
-use std::sync::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::SeqCst;
 use time;
 
-static DEVICE_ID_COUNTER: AtomicUsize  = ATOMIC_USIZE_INIT;
+static DEVICE_ID_COUNTER: AtomicUsize  = AtomicUsize::new(0);
 
 // Generates a unique identifier for any VRDisplay
 #[allow(dead_code)]

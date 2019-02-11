@@ -8,8 +8,8 @@ pub struct VRFramebuffer {
     /// The attributes set up for this framebuffer
     pub attributes: VRFramebufferAttributes,
 
-    /// UVs defining the texture bounds to present to the eye in UV space: [x,y,w,h]
-    /// Defaults to [0.0, 0.0, 0.5, 1.0]
+    /// The 2D rectangle that should be used to project the 3D scene
+    /// to the position of the eye camera. Measured in device pixels.
     pub viewport: VRViewport,
 }
 

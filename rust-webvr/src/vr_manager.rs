@@ -35,6 +35,8 @@ pub struct VRServiceManager {
     gamepads: HashMap<u32, VRGamepadPtr>
 }
 
+unsafe impl Send for VRServiceManager {}
+
 impl Drop for VRServiceManager {
      fn drop(&mut self) {
          self.gamepads.clear();

@@ -10,6 +10,11 @@ mod mock;
 #[cfg(feature = "mock")]
 pub use self::mock::MockServiceCreator;
 
+#[cfg(feature = "glwindow")]
+mod glwindow;
+#[cfg(feature = "glwindow")]
+pub use self::glwindow::GlWindowVRService;
+
 #[cfg(all(target_os="windows", feature = "openvr"))]
 mod openvr;
 #[cfg(all(target_os="windows", feature = "openvr"))]

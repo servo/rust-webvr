@@ -38,6 +38,7 @@ pub mod vr_stage_parameters;
 pub mod vr_event;
 pub mod vr_field_view;
 pub mod vr_gamepad;
+pub mod vr_main_thread_heartbeat;
 
 pub use vr_display::{VRDisplay,VRDisplayPtr};
 pub use vr_service::{VRService,VRServiceCreator};
@@ -56,3 +57,4 @@ pub use vr_event::{VREvent, VRDisplayEvent, VRDisplayEventReason, VRGamepadEvent
 pub use vr_field_view::VRFieldOfView;
 pub use vr_gamepad::{VRGamepad, VRGamepadPtr, VRGamepadHand,
                      VRGamepadData, VRGamepadState, VRGamepadButton};
+pub use vr_main_thread_heartbeat::VRMainThreadHeartbeat;

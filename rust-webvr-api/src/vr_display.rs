@@ -1,4 +1,5 @@
 use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRFutureFrameData, VRLayer};
+use gleam::gl::Gl;
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
@@ -53,6 +54,14 @@ pub trait VRDisplay: Send + Sync {
     /// Submits frame to the display
     /// Must be called in the render thread
     fn submit_frame(&mut self);
+
+    /// Renders a VRLayer from an external texture, and submits it to the device.
+    /// Must be called in the render thread
+    #[allow(unused_variables)]
+    fn submit_layer(&mut self, gl: &Gl, layer: &VRLayer) {
+        self.render_layer(layer);
+        self.submit_frame();
+    }
 
     /// Hint to indicate that we are going to start sending frames to the device
     fn start_present(&mut self, _attributes: Option<VRFramebufferAttributes>) {}

@@ -1,4 +1,4 @@
-use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRLayer};
+use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRFutureFrameData, VRLayer};
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
@@ -15,6 +15,15 @@ pub trait VRDisplay: Send + Sync {
     /// Returns the immediate VRFrameData of the HMD
     /// Should be used when not presenting to the device.
     fn immediate_frame_data(&self, near_z: f64, far_z: f64) -> VRFrameData;
+
+    /// Returns the synced VRFrameData to render the next frame.
+    /// The future that is returned will resolve with frame data when the
+    /// next frame is available.
+    fn future_frame_data(&mut self, near_z: f64, far_z: f64) -> VRFutureFrameData {
+        // The default implementation blocks waiting for the display.
+        self.sync_poses();
+        VRFutureFrameData::resolved(self.synced_frame_data(near_z, far_z))
+    }
 
     /// Returns the synced VRFrameData to render the current frame.
     /// Should be used when presenting to the device.

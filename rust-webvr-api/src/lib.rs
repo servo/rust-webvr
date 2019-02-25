@@ -18,6 +18,9 @@ pub mod utils;
 #[macro_use]
 extern crate serde_derive;
 
+#[cfg(feature = "ipc")]
+extern crate ipc_channel;
+
 pub mod vr_display;
 pub mod vr_service;
 pub mod vr_display_data;
@@ -26,6 +29,7 @@ pub mod vr_eye;
 pub mod vr_eye_parameters;
 pub mod vr_framebuffer;
 pub mod vr_frame_data;
+pub mod vr_future_frame_data;
 pub mod vr_layer;
 pub mod vr_pose;
 pub mod vr_stage_parameters;
@@ -41,6 +45,8 @@ pub use vr_eye::VREye;
 pub use vr_eye_parameters::VREyeParameters;
 pub use vr_framebuffer::{VRFramebuffer, VRFramebufferAttributes, VRViewport};
 pub use vr_frame_data::VRFrameData;
+pub use vr_future_frame_data::VRFutureFrameData;
+pub use vr_future_frame_data::VRResolveFrameData;
 pub use vr_layer::VRLayer;
 pub use vr_pose::VRPose;
 pub use vr_stage_parameters::VRStageParameters;

@@ -21,6 +21,8 @@ extern crate serde_derive;
 #[cfg(feature = "ipc")]
 extern crate ipc_channel;
 
+extern crate gleam;
+
 pub mod vr_display;
 pub mod vr_service;
 pub mod vr_display_data;

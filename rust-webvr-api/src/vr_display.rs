@@ -20,6 +20,7 @@ pub trait VRDisplay: Send + Sync {
     /// Returns the synced VRFrameData to render the next frame.
     /// The future that is returned will resolve with frame data when the
     /// next frame is available.
+    #[allow(deprecated)]
     fn future_frame_data(&mut self, near_z: f64, far_z: f64) -> VRFutureFrameData {
         // The default implementation blocks waiting for the display.
         self.sync_poses();
@@ -29,6 +30,7 @@ pub trait VRDisplay: Send + Sync {
     /// Returns the synced VRFrameData to render the current frame.
     /// Should be used when presenting to the device.
     /// sync_poses must have been called before this call.
+    #[deprecated(since="0.10.3", note="please use `future_frame_data` instead")]
     fn synced_frame_data(&self, next: f64, far_z: f64) -> VRFrameData;
 
     /// Resets the pose for this display
@@ -37,6 +39,7 @@ pub trait VRDisplay: Send + Sync {
     /// Synchronization point to keep in step with the HMD
     /// Returns VRFrameData to be used in the next render frame
     /// Must be called in the render thread, before doing any work
+    #[deprecated(since="0.10.3", note="please use `future_frame_data` instead")]
     fn sync_poses(&mut self);
 
     /// Binds the framebuffer to directly render to the HDM
@@ -49,15 +52,18 @@ pub trait VRDisplay: Send + Sync {
 
     /// Renders a VRLayer from a external texture
     /// Must be called in the render thread
+    #[deprecated(since="0.10.3", note="please use `submit_layer` instead")]
     fn render_layer(&mut self, layer: &VRLayer);
 
     /// Submits frame to the display
     /// Must be called in the render thread
+    #[deprecated(since="0.10.3", note="please use `submit_layer` instead")]
     fn submit_frame(&mut self);
 
     /// Renders a VRLayer from an external texture, and submits it to the device.
     /// Must be called in the render thread
     #[allow(unused_variables)]
+    #[allow(deprecated)]
     fn submit_layer(&mut self, gl: &Gl, layer: &VRLayer) {
         self.render_layer(layer);
         self.submit_frame();

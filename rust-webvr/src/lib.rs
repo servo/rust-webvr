@@ -9,6 +9,16 @@ extern crate libloading;
 extern crate log;
 #[cfg(all(feature = "oculusvr", target_os= "android"))]
 extern crate ovr_mobile_sys;
+#[cfg(feature = "glwindow")]
+extern crate euclid;
+#[cfg(feature = "glwindow")]
+extern crate gleam;
+#[cfg(feature = "glwindow")]
+extern crate glutin;
+#[cfg(feature = "glwindow")]
+extern crate winit;
+#[cfg(feature = "serde-serialization")]
+#[macro_use] extern crate serde_derive;
 
 #[cfg(any(feature = "googlevr", feature= "oculusvr"))]
 mod gl {
@@ -31,6 +41,9 @@ mod egl {
     pub type NativeWindowType = EGLNativeWindowType;
     include!(concat!(env!("OUT_DIR"), "/egl_bindings.rs"));
 }
+
+#[cfg(feature= "glwindow")]
+pub use api::GlWindowVRService;
 
 pub mod api;
 mod vr_manager;

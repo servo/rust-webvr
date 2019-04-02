@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.10.2"
+version = "0.10.3"
 authors = ["The Servo Project Developers"]
 
 homepage = "https://github.com/servo/rust-webvr"
@@ -41,4 +41,4 @@ winit = { version = "0.18", optional = true }
 
 [build-dependencies]
 gl_generator = "0.10"
-bindgen = "0.46"
+bindgen = "0.49.0"

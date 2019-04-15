@@ -149,7 +149,7 @@ impl VRDisplay for OpenVRDisplay {
     }
 
     fn render_layer(&mut self, layer: &VRLayer) {
-        self.frame_texture.handle = unsafe { mem::transmute(layer.texture_id as u64) };
+        self.frame_texture.handle = unsafe { mem::transmute(layer.texture_id as usize) };
         self.left_bounds = texture_bounds_to_openvr(&layer.left_bounds);
         self.right_bounds = texture_bounds_to_openvr(&layer.right_bounds);
     }

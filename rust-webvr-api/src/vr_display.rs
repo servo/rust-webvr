@@ -1,4 +1,4 @@
-use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRFutureFrameData, VRLayer};
+use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRFutureFrameData, VRGamepadPtr, VRLayer};
 use gleam::gl::Gl;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -12,6 +12,9 @@ pub trait VRDisplay: Send + Sync {
 
     /// Returns the current display data.
     fn data(&self) -> VRDisplayData;
+
+    /// Returns gamepads attached to this display
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>, String>;
 
     /// Returns the immediate VRFrameData of the HMD
     /// Should be used when not presenting to the device.

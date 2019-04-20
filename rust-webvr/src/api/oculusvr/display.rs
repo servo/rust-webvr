@@ -2,7 +2,7 @@
 #![cfg(feature = "oculusvr")]
 
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREvent, VRDisplayEvent, 
-    VREyeParameters, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRLayer, VRViewport};
+    VREyeParameters, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRGamepadPtr, VRLayer, VRViewport};
 use android_injected_glue::ffi as ndk;
 use gl;
 use egl;
@@ -111,6 +111,10 @@ impl VRDisplay for OculusVRDisplay {
         }
 
         data
+    }
+
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
+        Ok(self.gamepads.iter().cloned().map(|g| g as VRGamepadPtr).collect())
     }
 
     fn reset_pose(&mut self) {
@@ -638,10 +642,6 @@ impl OculusVRDisplay {
         let mut events = self.events.lock().unwrap();
         out.extend(events.drain(..));
         self.new_events_hint = false;
-    }
-
-    pub fn fetch_gamepads(&self, out: &mut Vec<OculusVRGamepadPtr>) {
-        out.extend(self.gamepads.iter().cloned());
     }
 }
 

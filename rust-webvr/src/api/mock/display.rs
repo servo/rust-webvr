@@ -1,4 +1,4 @@
-use {VRDisplay, VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRStageParameters, VRLayer, VRViewport};
+use {VRDisplay, VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRGamepadPtr, VRStageParameters, VRLayer, VRViewport};
 use rust_webvr_api::utils;
 use std::sync::Arc;
 use std::cell::RefCell;
@@ -136,6 +136,10 @@ impl VRDisplay for MockVRDisplay {
 
     fn render_layer(&mut self, _layer: &VRLayer) {
         // No op
+    }
+
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
+        Ok(Vec::new())
     }
 
     fn submit_frame(&mut self) {

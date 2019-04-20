@@ -1,5 +1,5 @@
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VREyeParameters, VRFrameData};
-use {VRFramebuffer, VRPose, VRStageParameters, VRFieldOfView, VRLayer};
+use {VRFramebuffer, VRPose, VRStageParameters, VRFieldOfView, VRGamepadPtr, VRLayer};
 use super::binding as openvr;
 use super::binding::ETrackedPropertyError::*;
 use super::binding::ETrackedDeviceProperty::*;
@@ -9,6 +9,7 @@ use super::binding::ETrackingUniverseOrigin::*;
 use super::binding::EGraphicsAPIConvention::*;
 use super::library::OpenVRLibrary;
 use super::constants;
+use super::gamepad::OpenVRGamepadPtr;
 use rust_webvr_api::utils;
 use std::ffi::CString;
 use std::sync::Arc;
@@ -30,6 +31,7 @@ pub struct OpenVRDisplay {
     frame_texture:  openvr::Texture_t,
     left_bounds: openvr::VRTextureBounds_t,
     right_bounds: openvr::VRTextureBounds_t,
+    gamepads: Vec<OpenVRGamepadPtr>,
 }
 
 unsafe impl Send for OpenVRDisplay {}
@@ -55,6 +57,7 @@ impl OpenVRDisplay {
             },
             left_bounds: unsafe { mem::zeroed() },
             right_bounds: unsafe { mem::zeroed() },
+            gamepads: Vec::new(),
         }))
     }
 }
@@ -148,6 +151,10 @@ impl VRDisplay for OpenVRDisplay {
 
     }
 
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
+        Ok(self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect())
+    }
+
     fn render_layer(&mut self, layer: &VRLayer) {
         self.frame_texture.handle = unsafe { mem::transmute(layer.texture_id as usize) };
         self.left_bounds = texture_bounds_to_openvr(&layer.left_bounds);
@@ -179,6 +186,10 @@ impl VRDisplay for OpenVRDisplay {
 }
 
 impl OpenVRDisplay {
+    pub fn set_gamepads(&mut self, gp: Vec<OpenVRGamepadPtr>) {
+        self.gamepads = gp;
+    }
+
     fn get_string_property(&self, name: openvr::ETrackedDeviceProperty) -> String {
         let max_size = 256;
         let result = String::with_capacity(max_size);

@@ -82,62 +82,15 @@ impl VRService for OpenVRService {
     }
 
     fn fetch_displays(&mut self) -> Result<Vec<VRDisplayPtr>,String> {
-        // Return cached displays if available
-        if self.initialized && self.displays.len() > 0 {
-            return Ok(self.clone_displays());
-        }
-        // Ensure that there are not initialization errors
-        try!(self.initialize());
+        self.init_displays()?;
 
-        let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
-        self.displays.clear();
-
-        for i in 0..max_device_count {
-            let device_class: openvr::ETrackedDeviceClass = unsafe {
-                (*self.system).GetTrackedDeviceClass.unwrap()(i as openvr::TrackedDeviceIndex_t)
-            };
-            
-            match device_class {
-                ETrackedDeviceClass_TrackedDeviceClass_HMD => {
-                    self.displays.push(OpenVRDisplay::new(self.lib.as_ref().unwrap(), i, self.system, self.chaperone));
-                },
-                _ => {}
-            }
-        }
-
-
-        Ok(self.clone_displays())
+        Ok(self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect())
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
-        // Return cached gamepads if available
-        if self.initialized && self.gamepads.len() > 0 {
-            return Ok(self.clone_gamepads());
-        }
-        try!(self.initialize());
+        self.init_displays()?;
 
-        let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
-        self.gamepads.clear();
-
-        let display_id = match self.displays.first() {
-            Some(display) => display.borrow().id(),
-            None => 0
-        };
-
-        for i in 0..max_device_count {
-            let device_class: openvr::ETrackedDeviceClass = unsafe {
-                (*self.system).GetTrackedDeviceClass.unwrap()(i as openvr::TrackedDeviceIndex_t)
-            };
-
-            match device_class {
-                ETrackedDeviceClass_TrackedDeviceClass_Controller => {
-                    self.gamepads.push(OpenVRGamepad::new(i, self.system, display_id));
-                },
-                _ => {}
-            }
-        }
-
-        Ok(self.clone_gamepads())
+        Ok(self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect())
     }
 
     fn is_available(&self) -> bool {
@@ -242,12 +195,48 @@ impl OpenVRService {
         }
     }
 
-    fn clone_displays(&self) -> Vec<VRDisplayPtr> {
-        self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
-    }
+    fn init_displays(&mut self) -> Result<(), String> {
+        // Return cached displays if available
+        if self.initialized && self.displays.len() > 0 {
+            return Ok(());
+        }
+        // Ensure that there are not initialization errors
+        self.initialize()?;
 
-    fn clone_gamepads(&self) -> Vec<VRGamepadPtr> {
-        self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect()
+        let max_device_count: u32 = openvr::k_unMaxTrackedDeviceCount;
+        self.displays.clear();
+        let mut gamepad_ids = vec![];
+        for i in 0..max_device_count {
+            let device_class: openvr::ETrackedDeviceClass = unsafe {
+                (*self.system).GetTrackedDeviceClass.unwrap()(i as openvr::TrackedDeviceIndex_t)
+            };
+            
+            match device_class {
+                ETrackedDeviceClass_TrackedDeviceClass_HMD => {
+                    self.displays.push(OpenVRDisplay::new(self.lib.as_ref().unwrap(), i, self.system, self.chaperone));
+                },
+                ETrackedDeviceClass_TrackedDeviceClass_Controller => {
+                    gamepad_ids.push(i);
+                }
+                _ => ()
+            }
+        }
+
+        let display_id = if let Some(ref d) = self.displays.first() {
+            d.borrow().id()
+        } else {
+            0
+        };
+ 
+
+        for id in gamepad_ids {
+            self.gamepads.push(OpenVRGamepad::new(id, self.system, display_id));
+        }
+
+        if let Some(ref d) = self.displays.first() {
+            d.borrow_mut().set_gamepads(self.gamepads.clone());
+        }
+        Ok(())
     }
 
     pub fn get_display(&self, index: openvr::TrackedDeviceIndex_t) -> Option<&OpenVRDisplayPtr> {

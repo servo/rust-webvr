@@ -12,6 +12,7 @@ use rust_webvr_api::VRFrameData;
 use rust_webvr_api::VRFutureFrameData;
 use rust_webvr_api::VRFramebuffer;
 use rust_webvr_api::VRFramebufferAttributes;
+use rust_webvr_api::VRGamepadPtr;
 use rust_webvr_api::VRLayer;
 use rust_webvr_api::VRViewport;
 use std::cell::RefCell;
@@ -171,6 +172,10 @@ impl VRDisplay for GlWindowVRDisplay {
 
     fn stop_present(&mut self) {
         let _ = self.sender.send(GlWindowVRMessage::StopPresenting);
+    }
+
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>, String> {
+        Ok(vec![])
     }
 }
 

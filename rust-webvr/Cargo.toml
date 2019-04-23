@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.10.4"
+version = "0.11.0"
 authors = ["The Servo Project Developers"]
 
 homepage = "https://github.com/servo/rust-webvr"
@@ -28,7 +28,7 @@ googlevr = ["gvr-sys"]
 oculusvr = ["ovr-mobile-sys"]
 
 [dependencies]
-rust-webvr-api = { path = "../rust-webvr-api", version = "0.10.4" }
+rust-webvr-api = { path = "../rust-webvr-api", version = "0.11.0" }
 log  = "0.4"
 gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }

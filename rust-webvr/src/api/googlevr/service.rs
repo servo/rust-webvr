@@ -2,7 +2,6 @@
 
 use {VRService, VRDisplay, VRDisplayPtr, VREvent, VRGamepadPtr};
 use super::display::{GoogleVRDisplay, GoogleVRDisplayPtr};
-use super::gamepad::{GoogleVRGamepad, GoogleVRGamepadPtr};
 #[cfg(target_os="android")]
 use rust_webvr_api::jni_utils::JNIScope;
 #[cfg(target_os="android")]
@@ -17,8 +16,7 @@ const SERVICE_CLASS_NAME:&'static str = "com/rust/webvr/GVRService";
 pub struct GoogleVRService {
     ctx: *mut gvr::gvr_context,
     controller_ctx: *mut gvr::gvr_controller_context,
-    displays: Vec<GoogleVRDisplayPtr>,
-    gamepads: Vec<GoogleVRGamepadPtr>,
+    display: Option<GoogleVRDisplayPtr>,
     #[cfg(target_os="android")]
     pub java_object: ndk::jobject,
     #[cfg(target_os="android")]
@@ -46,36 +44,13 @@ impl VRService for GoogleVRService {
     }
 
     fn fetch_displays(&mut self) -> Result<Vec<VRDisplayPtr>,String> {
-        // Return cached displays if available
-        if self.is_initialized() && self.displays.len() > 0 {
-            return Ok(self.clone_displays());
-        }
-
-        // Ensure that there are not initialization errors
-        try!(self.initialize());
-        let display = unsafe { GoogleVRDisplay::new(self, self.ctx) };
-        self.displays.push(display);
-
-        Ok(self.clone_displays())
+        let display = self.init_display()?;
+        Ok(vec![display.clone()])
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
-        // Return cached gamepads if available
-        if self.is_initialized() && self.gamepads.len() > 0 {
-            return Ok(self.clone_gamepads());
-        }
-        try!(self.initialize());
-
-        let gamepad = unsafe {
-            let display_id = match self.displays.first() {
-                Some(display) => display.borrow().id(),
-                None => 0
-            };
-            try!(GoogleVRGamepad::new(self.ctx, self.controller_ctx, display_id))
-        };
-        self.gamepads.push(gamepad);
-        
-        Ok(self.clone_gamepads())
+        let display = self.init_display()?;
+        display.borrow_mut().fetch_gamepads()
     }
 
     fn is_available(&self) -> bool {
@@ -84,11 +59,12 @@ impl VRService for GoogleVRService {
 
     fn poll_events(&self) -> Vec<VREvent> {
         let mut events = Vec::new();
-        for display in &self.displays {
-            display.borrow_mut().poll_events(&mut events);
-        }
-        for gamepad in &self.gamepads {
-            gamepad.borrow_mut().handle_events();
+        if let Some(ref display) = self.display {
+            let mut d = display.borrow_mut();
+            d.poll_events(&mut events);
+            if let Some(ref gp) = d.gamepad() {
+                gp.borrow_mut().handle_events();
+            }
         }
         events
     }
@@ -100,8 +76,7 @@ impl GoogleVRService {
         GoogleVRService {
             ctx: ptr::null_mut(),
             controller_ctx: ptr::null_mut(),
-            displays: Vec::new(),
-            gamepads: Vec::new(),
+            display: None,
             java_object: ptr::null_mut(),
             java_class: ptr::null_mut()
         }
@@ -112,8 +87,7 @@ impl GoogleVRService {
         GoogleVRService {
             ctx: ptr::null_mut(),
             controller_ctx: ptr::null_mut(),
-            displays: Vec::new(),
-            gamepads: Vec::new(),
+            display: None,
         }
     }
 
@@ -171,27 +145,24 @@ impl GoogleVRService {
         return !self.ctx.is_null();
     }
 
-    fn clone_displays(&self) -> Vec<VRDisplayPtr> {
-        self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
-    }
+    fn init_display(&mut self) -> Result<&GoogleVRDisplayPtr, String> {
+        self.initialize()?;
 
-    fn clone_gamepads(&self) -> Vec<VRGamepadPtr> {
-        self.gamepads.iter().map(|d| d.clone() as VRGamepadPtr).collect()
+        if let Some(ref d) = self.display {
+            Ok(d)
+        } else {
+            self.display = unsafe { Some(GoogleVRDisplay::new(self, self.ctx, self.controller_ctx)) };
+            Ok(self.display.as_ref().unwrap())
+        }
     }
 
     // Called from Java main thread
     // Pause & resume methods are thread safe
     #[cfg(target_os="android")]
     fn on_pause(&mut self) {
-        for display in &self.displays {
+        if let Some(ref display) = self.display {
             unsafe {
                 (*display.as_ptr()).pause();
-            }
-        }
-
-        for gamepad in &self.gamepads {
-            unsafe {
-                (*gamepad.as_ptr()).pause();
             }
         }
     }
@@ -200,14 +171,9 @@ impl GoogleVRService {
     // Pause & resume methods are thread safe
     #[cfg(target_os="android")]
     fn on_resume(&mut self) {
-        for display in &self.displays {
+        if let Some(ref display) = self.display {
             unsafe {
                 (*display.as_ptr()).resume();
-            }
-        }
-        for gamepad in &self.gamepads {
-            unsafe {
-                (*gamepad.as_ptr()).resume();
             }
         }
     }

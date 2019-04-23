@@ -5,7 +5,7 @@ use std::mem;
 use std::sync::Arc;
 use {
     VRDisplay, VRDisplayData, VRDisplayEvent, VRFrameData, VRFramebuffer,
-    VRFramebufferAttributes, VRLayer, VRViewport,
+    VRFramebufferAttributes, VRGamepadPtr, VRLayer, VRViewport,
 };
 
 pub type VRExternalDisplayPtr = Arc<RefCell<VRExternalDisplay>>;
@@ -239,6 +239,10 @@ impl VRDisplay for VRExternalDisplay {
 
         self.browser_state.layerState[0] = layer;
         self.push_browser();
+    }
+
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>, String> {
+        Ok(Vec::new())
     }
 
     fn start_present(&mut self, attributes: Option<VRFramebufferAttributes>) {

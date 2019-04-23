@@ -1,2 +1,13 @@
 language: rust
-script: cargo build --features=googlevr,oculusvr
+
+rust:
+  - stable
+
+before_script:
+  - rustup target add armv7-linux-androideabi
+  - rustup target add x86_64-pc-windows-gnu
+  - sudo apt-get install libc6-dev-i386
+
+script:
+  - cargo check --target x86_64-pc-windows-gnu
+  - cd rust-webvr && cargo check --features "mock oculusvr googlevr" --no-default-features --target=armv7-linux-androideabi

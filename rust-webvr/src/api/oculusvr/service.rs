@@ -1,7 +1,7 @@
 #![cfg(target_os="android")]
 #![cfg(feature = "oculusvr")]
 
-use {VRService, VRDisplayPtr, VREvent, VRGamepadPtr};
+use {VRDisplay, VRService, VRDisplayPtr, VREvent, VRGamepadPtr};
 use android_injected_glue as android;
 use android_injected_glue::ffi as ndk;
 use ovr_mobile_sys as ovr;
@@ -14,7 +14,7 @@ const SERVICE_CLASS_NAME:&'static str = "com/rust/webvr/OVRService";
 
 pub struct OculusVRService {
     initialized: bool,
-    displays: Vec<OculusVRDisplayPtr>,
+    display: Option<OculusVRDisplayPtr>,
     service_java: OVRServiceJava,
     ovr_java: OVRJava,
     // SurfaceView Life cycle
@@ -41,29 +41,14 @@ impl VRService for OculusVRService {
     }
 
     fn fetch_displays(&mut self) -> Result<Vec<VRDisplayPtr>,String> {
-        // Return cached displays if available
-        if self.is_initialized() && self.displays.len() > 0 {
-            return Ok(self.clone_displays());
-        }
+        let display = self.init_display()?;
 
-        // Ensure that there are not initialization errors
-        try!(self.initialize());
-        let display = OculusVRDisplay::new(self.service_java.clone(), self.ovr_java.handle());
-        self.displays.push(display);
-
-        Ok(self.clone_displays())
+        Ok(vec![display.clone()])
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
-        try!(self.initialize());
-
-        let mut result = Vec::new();
-        for display in &self.displays {
-            display.borrow().fetch_gamepads(&mut result);
-        }
-
-        let result = result.drain(0..).map(|d| d as VRGamepadPtr).collect();
-        Ok(result)
+        let display = self.init_display()?;
+        display.borrow_mut().fetch_gamepads()
     }
 
     fn is_available(&self) -> bool {
@@ -72,7 +57,7 @@ impl VRService for OculusVRService {
 
     fn poll_events(&self) -> Vec<VREvent> {
         let mut events = Vec::new();
-        for display in &self.displays {
+        if let Some(ref display) = self.display {
             display.borrow_mut().poll_events(&mut events);
         }
         events
@@ -83,13 +68,25 @@ impl OculusVRService {
     pub fn new() -> OculusVRService {
         OculusVRService {
             initialized: false,
-            displays: Vec::new(),
+            display: None,
             service_java: OVRServiceJava::default(),
             ovr_java: OVRJava::default(),
             resume_received: true, // True because Activity is already resumed when service initialized
             pause_received: false,
             surface_create_received: false,
             surface_destroy_received: false,
+        }
+    }
+
+
+    fn init_display(&mut self) -> Result<&OculusVRDisplayPtr, String> {
+        self.initialize()?;
+
+        if let Some(ref d) = self.display {
+            Ok(d)
+        } else {
+            self.display = Some(OculusVRDisplay::new(self.service_java.clone(), self.ovr_java.handle()));
+            Ok(self.display.as_ref().unwrap())
         }
     }
 
@@ -138,14 +135,10 @@ impl OculusVRService {
         }
     }
 
-    fn clone_displays(&self) -> Vec<VRDisplayPtr> {
-        self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
-    }
-
     // Called from Java main thread
     // Pause & resume methods are thread safe
     fn on_pause(&mut self) {
-        for display in &self.displays {
+        if let Some(ref display) = self.display {
             unsafe {
                 (*display.as_ptr()).pause();
             }
@@ -155,7 +148,7 @@ impl OculusVRService {
     // Called from Java main thread
     // Pause & resume methods are thread safe
     fn on_resume(&mut self) {
-        for display in &self.displays {
+        if let Some(ref display) = self.display {
             unsafe {
                 (*display.as_ptr()).resume();
             }
@@ -180,7 +173,7 @@ impl OculusVRService {
         }
 
         // Notify Displays
-        for display in &self.displays {
+        if let Some(ref display) = self.display {
             (*display.as_ptr()).update_surface(self.service_java.surface);
         }
     }

@@ -1,7 +1,8 @@
 #![cfg(feature = "googlevr")]
 use {VRDisplay, VRDisplayData, VRDisplayCapabilities, VRFramebuffer, VRFramebufferAttributes,
-    VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer, VRViewport};
+    VREvent, VRDisplayEvent, VREyeParameters, VRFrameData, VRLayer, VRViewport, VRGamepadPtr};
 use super::service::GoogleVRService;
+use super::gamepad::{GoogleVRGamepad, GoogleVRGamepadPtr};
 use rust_webvr_api::utils;
 #[cfg(target_os="android")]
 use rust_webvr_api::jni_utils::JNIScope;
@@ -26,6 +27,7 @@ const PREDICTION_OFFSET_NANOS: i64 = 50000000; // 50ms
 
 pub struct GoogleVRDisplay {
     service: *const GoogleVRService,
+    gamepad: Option<GoogleVRGamepadPtr>,
     ctx: *mut gvr::gvr_context,
     viewport_list: *mut gvr::gvr_buffer_viewport_list,
     left_eye_vp: *mut gvr::gvr_buffer_viewport,
@@ -76,6 +78,10 @@ impl VRDisplay for GoogleVRDisplay {
         data.stage_parameters = None;
 
         data
+    }
+
+    fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
+        Ok(self.gamepad.clone().map(|d| d as VRGamepadPtr).into_iter().collect())
     }
 
     fn immediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
@@ -311,7 +317,8 @@ impl VRDisplay for GoogleVRDisplay {
 
 impl GoogleVRDisplay {
     pub unsafe fn new(service: *const GoogleVRService,
-                      ctx: *mut gvr::gvr_context) -> Arc<RefCell<GoogleVRDisplay>> {
+                      ctx: *mut gvr::gvr_context,
+                      controller_ctx: *mut gvr::gvr_controller_context) -> Arc<RefCell<GoogleVRDisplay>> {
         let list = gvr::gvr_buffer_viewport_list_create(ctx);
 
         // gvr_refresh_viewer_profile must be called before getting recommended bufer viewports.
@@ -327,6 +334,13 @@ impl GoogleVRDisplay {
         gvr::gvr_buffer_viewport_list_get_item(list, gvr::gvr_eye::GVR_LEFT_EYE as usize, left_eye_vp);
         let right_eye_vp = gvr::gvr_buffer_viewport_create(ctx);
         gvr::gvr_buffer_viewport_list_get_item(list, gvr::gvr_eye::GVR_RIGHT_EYE as usize, right_eye_vp);
+
+        let display_id = utils::new_id();
+        let gamepad = GoogleVRGamepad::new(ctx, controller_ctx, display_id).ok();
+
+        if gamepad.is_none() {
+            warn!("No googlevr gamepad found");
+        }
 
         Arc::new(RefCell::new(GoogleVRDisplay {
             service: service,
@@ -344,14 +358,19 @@ impl GoogleVRDisplay {
             synced_head_matrix: gvr_identity_matrix(),
             fbo_id: 0,
             fbo_texture: 0,
-            display_id: utils::new_id(),
+            display_id,
             presenting: false,
             paused: false,
             new_events_hint: false,
             pending_events: Mutex::new(Vec::new()),
             processed_events: Mutex::new(Vec::new()),
             attributes: Default::default(),
+            gamepad
         }))
+    }
+
+    pub fn gamepad(&self) -> Option<&GoogleVRGamepadPtr> {
+        self.gamepad.as_ref()
     }
 
     unsafe fn initialize_gl(&mut self) {
@@ -513,21 +532,27 @@ impl GoogleVRDisplay {
     // Warning: this function is called from java Main thread
     // Use mutexes to ensure thread safety and process the event in sync with the render loop.
     #[allow(dead_code)]
-    pub fn pause(&mut self) {
+    pub unsafe fn pause(&mut self) {
         let mut pending = self.pending_events.lock().unwrap();
         pending.push(VRDisplayEvent::Pause(self.display_id).into());
 
         self.new_events_hint = true;
+        if let Some(ref gamepad) = self.gamepad {
+            (*gamepad.as_ptr()).pause();
+        }
     }
 
     // Warning: this function is called from java Main thread
     // Use mutexes to ensure thread safety and process the event in sync with the render loop.
     #[allow(dead_code)]
-    pub fn resume(&mut self) {
+    pub unsafe fn resume(&mut self) {
         let mut pending = self.pending_events.lock().unwrap();
         pending.push(VRDisplayEvent::Resume(self.display_id).into());
 
         self.new_events_hint = true;
+        if let Some(ref gamepad) = self.gamepad {
+            (*gamepad.as_ptr()).resume();
+        }
     }
 
     fn handle_events(&mut self) {

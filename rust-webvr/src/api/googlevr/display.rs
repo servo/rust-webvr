@@ -338,6 +338,10 @@ impl GoogleVRDisplay {
         let display_id = utils::new_id();
         let gamepad = GoogleVRGamepad::new(ctx, controller_ctx, display_id).ok();
 
+        if gamepad.is_none() {
+            warn!("No googlevr gamepad found");
+        }
+
         Arc::new(RefCell::new(GoogleVRDisplay {
             service: service,
             ctx: ctx,

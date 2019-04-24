@@ -16,7 +16,7 @@ fn main() {
                  &Path::new(&aar_out_dir).join("OVRService.aar")).unwrap();
     }
 
-    if !cfg!(feature = "googlevr") && !cfg!(feature = "oculusvr") && !cfg!(feature = "vrexternal") {
+    if !cfg!(feature = "googlevr") && !cfg!(feature = "oculusvr") && !cfg!(feature = "vrexternal") && !cfg!(feature = "magicleap") {
         return;
     }
 
@@ -30,11 +30,47 @@ fn main() {
             .unwrap();
 
     // EGL bindings
-    if cfg!(feature = "oculusvr") {
+    if cfg!(any(feature = "magicleap", feature = "oculusvr")) {
         let mut file = File::create(&Path::new(&out_dir).join("egl_bindings.rs")).unwrap();
         Registry::new(Api::Egl, (1, 5), Profile::Core, Fallbacks::All, ["EGL_KHR_fence_sync"])
             .write_bindings(gl_generator::StaticGenerator, &mut file).unwrap();
         println!("cargo:rustc-link-lib=EGL");
+    }
+
+    // Magicleap C API
+    if cfg!(feature = "magicleap") {
+        let mut builder = bindgen::Builder::default()
+            .header("src/api/magicleap/magicleap_c_api.h")
+            .blacklist_type("MLResult")
+            .derive_default(true)
+            .rustfmt_bindings(true);
+
+        if let Ok(mlsdk) = env::var("MAGICLEAP_SDK") {
+            builder = builder.clang_args(&[
+                format!("--no-standard-includes"),
+                format!("--sysroot={}", mlsdk),
+                format!("-I{}/include", mlsdk),
+                format!("-I{}/lumin/usr/include", mlsdk),
+                format!("-I{}/tools/toolchains/lib64/clang/3.8/include", mlsdk),
+            ]);
+        }
+
+        if let Ok(flags) = env::var("CFLAGS") {
+            for flag in flags.split_whitespace() {
+                builder = builder.clang_arg(flag);
+            }
+        }
+
+        if let Ok(flags) = env::var("CLANGFLAGS") {
+            for flag in flags.split_whitespace() {
+                builder = builder.clang_arg(flag);
+            }
+        }
+
+        let bindings = builder.generate().expect("Unable to generate bindings");
+        let out_path = PathBuf::from(&out_dir);
+        bindings.write_to_file(out_path.join("magicleap_c_api.rs"))
+            .expect("Couldn't write bindings!");
     }
 
     let target = env::var("TARGET").unwrap();

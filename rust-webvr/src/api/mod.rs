@@ -15,6 +15,11 @@ mod glwindow;
 #[cfg(feature = "glwindow")]
 pub use self::glwindow::GlWindowVRService;
 
+#[cfg(feature = "magicleap")]
+mod magicleap;
+#[cfg(feature = "magicleap")]
+pub use self::magicleap::MagicLeapVRService;
+
 #[cfg(all(target_os="windows", feature = "openvr"))]
 mod openvr;
 #[cfg(all(target_os="windows", feature = "openvr"))]

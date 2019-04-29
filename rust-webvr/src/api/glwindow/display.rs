@@ -19,7 +19,7 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::mpsc::Sender;
 use super::heartbeat::GlWindowVRMessage;
-use winit::dpi::PhysicalSize;
+use glutin::dpi::PhysicalSize;
 
 // Fake a display with a distance between eyes of 5cm.
 const EYE_DISTANCE: f32 = 0.05;

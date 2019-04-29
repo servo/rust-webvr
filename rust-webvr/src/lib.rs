@@ -15,8 +15,6 @@ extern crate euclid;
 extern crate gleam;
 #[cfg(feature = "glwindow")]
 extern crate glutin;
-#[cfg(feature = "glwindow")]
-extern crate winit;
 #[cfg(feature = "serde-serialization")]
 #[macro_use] extern crate serde_derive;
 

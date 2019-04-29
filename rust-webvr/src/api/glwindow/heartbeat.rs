@@ -1,7 +1,6 @@
 use gleam::gl;
 use gleam::gl::Gl;
-use glutin::GlContext;
-use glutin::GlWindow;
+use glutin::{WindowedContext, NotCurrent};
 use rust_webvr_api::VRResolveFrameData;
 use rust_webvr_api::VRMainThreadHeartbeat;
 use std::rc::Rc;
@@ -14,7 +13,7 @@ const TIMEOUT: Duration = Duration::from_millis(16);
 
 pub struct GlWindowVRMainThreadHeartbeat {
     receiver: Receiver<GlWindowVRMessage>,
-    gl_window: GlWindow,
+    gl_context: Option<WindowedContext<NotCurrent>>,
     gl: Rc<dyn Gl>,
     presenting: bool,
     timestamp: f64,
@@ -49,13 +48,13 @@ impl VRMainThreadHeartbeat for GlWindowVRMainThreadHeartbeat {
 impl GlWindowVRMainThreadHeartbeat {
     pub(crate) fn new(
         receiver: Receiver<GlWindowVRMessage>, 
-        gl_window: GlWindow,
+        gl_context: WindowedContext<NotCurrent>,
         gl: Rc<Gl>,
     ) -> GlWindowVRMainThreadHeartbeat {
         debug!("Creating VR heartbeat");
         GlWindowVRMainThreadHeartbeat {
             receiver: receiver,
-            gl_window: gl_window,
+            gl_context: Some(gl_context),
             gl: gl,
             presenting: false,
             timestamp: 0.0,
@@ -68,15 +67,16 @@ impl GlWindowVRMainThreadHeartbeat {
            match msg {
                GlWindowVRMessage::StartPresenting => {
                     debug!("VR starting");
-                    self.gl_window.show();
+                    self.gl_context.as_ref().unwrap().window().show();
                     self.presenting = true;
                     true
                },
                GlWindowVRMessage::StartFrame(near, far, mut resolver) => {
                    debug!("VR start frame");
                    let timestamp = self.timestamp;
-                   let size = self.gl_window.get_inner_size().expect("No window size");
-                   let hidpi = self.gl_window.get_hidpi_factor();
+                   let window = self.gl_context.as_ref().unwrap().window();
+                   let size = window.get_inner_size().expect("No window size");
+                   let hidpi = window.get_hidpi_factor();
                    let size = size.to_physical(hidpi);
                    let data = GlWindowVRDisplay::frame_data(timestamp, size, near, far);
                    let _ = resolver.resolve(data);
@@ -86,10 +86,14 @@ impl GlWindowVRMainThreadHeartbeat {
                GlWindowVRMessage::StopFrame(width, height, buffer) => {
                    debug!("VR stop frame {}x{} ({})", width, height, buffer.len());
                    // TODO: render the buffer contents
-                   if let Err(err) = unsafe { self.gl_window.make_current() } {
-		       error!("VR Display failed to make window current ({:?})", err);
-		       return true;
-		   }
+                   let context = self.gl_context.take().expect("Context was current");
+                   let context = match unsafe { context.make_current() } {
+                       Err(err) => {
+                           error!("VR Display failed to make window current ({:?})", err);
+                           return true;
+                       },
+                       Ok(context) => context,
+                   };
                    if self.texture_id == 0 {
                        self.texture_id = self.gl.gen_textures(1)[0];
                        debug!("Generated texture {}", self.texture_id);
@@ -135,18 +139,28 @@ impl GlWindowVRMainThreadHeartbeat {
                    );
                    self.gl.bind_framebuffer(gl::READ_FRAMEBUFFER, 0);
 
-                   let _ = self.gl_window.swap_buffers();
+                   let _ = context.swap_buffers();
 
                    let err = self.gl.get_error();
                    if err != 0 {
                        error!("Test VR Display GL error {}.", err);
                    }
 
+                   let context = match unsafe { context.make_not_current() } {
+                       Err(err) => {
+                           error!("VR Display failed to make window non current ({:?})", err);
+                           return true;
+                       },
+                       Ok(context) => context,
+                   };
+
+                   self.gl_context = Some(context);
+
                    true
                },
                GlWindowVRMessage::StopPresenting => {
                     debug!("VR stopping");
-                    self.gl_window.hide();
+                    self.gl_context.as_ref().unwrap().window().hide();
                     self.presenting = false;
                     true
                },

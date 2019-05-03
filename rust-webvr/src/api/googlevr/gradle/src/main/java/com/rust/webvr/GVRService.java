@@ -18,6 +18,7 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
     private GvrLayout gvrLayout;
     private long mPtr = 0; // Native Rustlang struct pointer
     private boolean mPresenting = false;
+    private boolean mPaused = false;
     private boolean mGvrResumed = false;
 
     private static native void nativeOnPause(long ptr);
@@ -73,7 +74,9 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
 
         mActivity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         mActivity.getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        AndroidCompat.setVrModeEnabled(mActivity, true);
+        if (!AndroidCompat.setVrModeEnabled(mActivity, true)) {
+          Log.w("rust-webvr", "setVrModeEnabled failed");
+        }
 
         // Show GvrLayout
         FrameLayout rootLayout = (FrameLayout)mActivity.findViewById(android.R.id.content);
@@ -134,9 +137,10 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
         if (activity != mActivity) {
             return;
         }
-        if (mPresenting && gvrLayout != null && !mGvrResumed) {
+        if (mPaused && gvrLayout != null && !mGvrResumed) {
             gvrLayout.onResume();
             mGvrResumed = true;
+            mPaused = false;
             nativeOnResume(mPtr);
         }
     }
@@ -160,6 +164,7 @@ class GVRService  implements Application.ActivityLifecycleCallbacks {
         if (mPresenting && gvrLayout != null && mGvrResumed) {
             gvrLayout.onPause();
             mGvrResumed = false;
+            mPaused = true;
             nativeOnPause(mPtr);
         }
     }

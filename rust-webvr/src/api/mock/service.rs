@@ -2,7 +2,7 @@ use {VRService, VRDisplayPtr, VREvent, VRGamepadPtr};
 use super::display::{MockVRDisplay, MockVRDisplayPtr};
 
 pub struct MockVRService {
-    displays: Vec<MockVRDisplayPtr>,
+    display: MockVRDisplayPtr,
 }
 
 unsafe impl Send for MockVRService {}
@@ -13,11 +13,7 @@ impl VRService for MockVRService {
     }
 
     fn fetch_displays(&mut self) -> Result<Vec<VRDisplayPtr>,String> {
-        if self.displays.len() == 0 {
-            self.displays.push(MockVRDisplay::new())
-        }
-
-        Ok(self.clone_displays())
+        Ok(vec![self.display.clone()])
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
@@ -37,10 +33,7 @@ impl VRService for MockVRService {
 impl MockVRService {
     pub fn new() -> MockVRService {
         MockVRService {
-            displays: Vec::new(),
+            display: MockVRDisplay::new(),
         }
-    }
-    fn clone_displays(&self) -> Vec<VRDisplayPtr> {
-        self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
     }
 }

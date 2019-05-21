@@ -1,15 +1,20 @@
 use {VRDisplay, VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRGamepadPtr, VRStageParameters, VRLayer, VRViewport};
 use rust_webvr_api::utils;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
 pub type MockVRDisplayPtr = Arc<RefCell<MockVRDisplay>>;
 use std::time::Duration;
 use std::thread;
+use super::MockVRControlMsg;
 
 pub struct MockVRDisplay {
     display_id: u32,
     attributes: VRFramebufferAttributes,
+    state: Arc<Mutex<MockVRState>>,
 }
+
+#[derive(Default)]
+pub struct MockVRState {}
 
 unsafe impl Send for MockVRDisplay {}
 unsafe impl Sync for MockVRDisplay {}
@@ -19,7 +24,12 @@ impl MockVRDisplay {
         Arc::new(RefCell::new(MockVRDisplay {
             display_id: utils::new_id(),
             attributes: Default::default(),
+            state: Default::default(),
         }))
+    }
+
+    pub fn state_handle(&self) -> Arc<Mutex<MockVRState>> {
+        self.state.clone()
     }
 }
 
@@ -153,3 +163,10 @@ impl VRDisplay for MockVRDisplay {
     }
 }
 
+impl MockVRState {
+    pub fn handle_msg(&mut self, msg: MockVRControlMsg) {
+        match msg {
+
+        }
+    }
+}

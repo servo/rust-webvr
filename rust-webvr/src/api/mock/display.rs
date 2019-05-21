@@ -102,7 +102,21 @@ impl VRDisplay for MockVRDisplay {
 impl MockVRState {
     pub fn handle_msg(&mut self, msg: MockVRControlMsg) {
         match msg {
-
+            MockVRControlMsg::SetViewerPose(position, orientation) => {
+                self.frame_data.pose.position = Some(position);
+                self.frame_data.pose.orientation = Some(orientation);
+            }
+            MockVRControlMsg::SetEyeParameters(left, right) => {
+                self.display_data.left_eye_parameters = left;
+                self.display_data.right_eye_parameters = right;
+            }
+            MockVRControlMsg::SetProjectionMatrices(left, right) => {
+                self.frame_data.left_projection_matrix = left;
+                self.frame_data.right_projection_matrix = right;
+            }
+            MockVRControlMsg::SetStageParameters(stage) => {
+                self.display_data.stage_parameters = Some(stage);
+            }
         }
     }
 }

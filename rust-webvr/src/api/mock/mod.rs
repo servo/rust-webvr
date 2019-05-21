@@ -29,4 +29,6 @@ pub enum MockVRControlMsg {
     SetEyeParameters(VREyeParameters, VREyeParameters),
     SetProjectionMatrices([f32; 16], [f32; 16]),
     SetStageParameters(VRStageParameters),
+    Focus,
+    Blur,
 }

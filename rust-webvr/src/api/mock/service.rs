@@ -28,8 +28,7 @@ impl VRService for MockVRService {
     }
 
     fn poll_events(&self) -> Vec<VREvent> {
-        // TODO: fake mock events
-        Vec::new()
+        self.display.borrow().poll_events()
     }
 }
 

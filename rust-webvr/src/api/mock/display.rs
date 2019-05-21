@@ -1,7 +1,8 @@
-use {VRDisplay, VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRGamepadPtr, VRStageParameters, VRLayer, VRViewport};
+use {VRDisplay, VRDisplayData, VRDisplayEvent, VREvent, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRGamepadPtr, VRStageParameters, VRLayer, VRViewport};
 use rust_webvr_api::utils;
 use std::sync::{Arc, Mutex};
 use std::cell::RefCell;
+use std::mem;
 pub type MockVRDisplayPtr = Arc<RefCell<MockVRDisplay>>;
 use std::time::Duration;
 use std::thread;
@@ -16,6 +17,7 @@ pub struct MockVRDisplay {
 pub struct MockVRState {
     display_data: VRDisplayData,
     frame_data: VRFrameData,
+    events: Vec<VREvent>,
 }
 
 unsafe impl Send for MockVRDisplay {}
@@ -33,6 +35,11 @@ impl MockVRDisplay {
 
     pub fn state_handle(&self) -> Arc<Mutex<MockVRState>> {
         self.state.clone()
+    }
+
+    pub fn poll_events(&self) -> Vec<VREvent> {
+        let mut state = self.state.lock().unwrap();
+        mem::replace(&mut state.events, vec![])
     }
 }
 
@@ -109,6 +116,7 @@ impl MockVRState {
             MockVRControlMsg::SetEyeParameters(left, right) => {
                 self.display_data.left_eye_parameters = left;
                 self.display_data.right_eye_parameters = right;
+                self.events.push(VREvent::Display(VRDisplayEvent::Change(self.display_data.clone())))
             }
             MockVRControlMsg::SetProjectionMatrices(left, right) => {
                 self.frame_data.left_projection_matrix = left;
@@ -116,6 +124,13 @@ impl MockVRState {
             }
             MockVRControlMsg::SetStageParameters(stage) => {
                 self.display_data.stage_parameters = Some(stage);
+                self.events.push(VREvent::Display(VRDisplayEvent::Change(self.display_data.clone())))
+            }
+            MockVRControlMsg::Focus => {
+                self.events.push(VREvent::Display(VRDisplayEvent::Focus(self.display_data.clone())))
+            }
+            MockVRControlMsg::Blur => {
+                self.events.push(VREvent::Display(VRDisplayEvent::Blur(self.display_data.clone())))
             }
         }
     }
@@ -193,7 +208,8 @@ impl MockVRState {
 
         Self {
             display_data,
-            frame_data
+            frame_data,
+            events: vec![]
         }
     }
 }

@@ -1,8 +1,11 @@
 use {VRService, VRDisplayPtr, VREvent, VRGamepadPtr};
 use super::display::{MockVRDisplay, MockVRDisplayPtr};
+use super::MockVRControlMsg;
+use std::thread;
+use std::sync::mpsc::Receiver;
 
 pub struct MockVRService {
-    displays: Vec<MockVRDisplayPtr>,
+    display: MockVRDisplayPtr,
 }
 
 unsafe impl Send for MockVRService {}
@@ -13,11 +16,7 @@ impl VRService for MockVRService {
     }
 
     fn fetch_displays(&mut self) -> Result<Vec<VRDisplayPtr>,String> {
-        if self.displays.len() == 0 {
-            self.displays.push(MockVRDisplay::new())
-        }
-
-        Ok(self.clone_displays())
+        Ok(vec![self.display.clone()])
     }
 
     fn fetch_gamepads(&mut self) -> Result<Vec<VRGamepadPtr>,String> {
@@ -29,18 +28,32 @@ impl VRService for MockVRService {
     }
 
     fn poll_events(&self) -> Vec<VREvent> {
-        // TODO: fake mock events
-        Vec::new()
+        self.display.borrow().poll_events()
     }
 }
 
 impl MockVRService {
     pub fn new() -> MockVRService {
         MockVRService {
-            displays: Vec::new(),
+            display: MockVRDisplay::new(),
         }
     }
-    fn clone_displays(&self) -> Vec<VRDisplayPtr> {
-        self.displays.iter().map(|d| d.clone() as VRDisplayPtr).collect()
+
+    pub fn new_with_receiver(rcv: Receiver<MockVRControlMsg>) -> MockVRService {
+        let display = MockVRDisplay::new();
+        let state = display.borrow().state_handle();
+        thread::spawn(move || {
+            while let Ok(msg) = rcv.recv() {
+                // The only reason we need this is that the overall display API
+                // is somewhat unsound:
+                // https://github.com/servo/rust-webvr/issues/18 .
+                // Once that is fixed we should just have a handle to the display here
+                state.lock().unwrap().handle_msg(msg);
+            }
+        });
+        MockVRService {
+            display,
+        }
     }
 }
+

@@ -23,6 +23,8 @@ extern crate ipc_channel;
 
 extern crate gleam;
 
+
+pub mod mock;
 pub mod vr_display;
 pub mod vr_service;
 pub mod vr_display_data;
@@ -40,6 +42,7 @@ pub mod vr_field_view;
 pub mod vr_gamepad;
 pub mod vr_main_thread_heartbeat;
 
+pub use mock::MockVRControlMsg;
 pub use vr_display::{VRDisplay,VRDisplayPtr};
 pub use vr_service::{VRService,VRServiceCreator};
 pub use vr_display_data::VRDisplayData;

@@ -1,7 +1,7 @@
 mod display;
 mod service;
 
-use {VRService, VRServiceCreator, VREyeParameters, VRStageParameters};
+pub use {VRService, VRServiceCreator, VREyeParameters, VRStageParameters, MockVRControlMsg};
 use std::sync::mpsc::{channel, Sender};
 
 pub struct MockServiceCreator;
@@ -22,13 +22,4 @@ impl VRServiceCreator for MockServiceCreator {
      fn new_service(&self) -> Box<VRService> {
          Box::new(service::MockVRService::new())
      }
-}
-
-pub enum MockVRControlMsg {
-    SetViewerPose([f32; 3], [f32; 4]),
-    SetEyeParameters(VREyeParameters, VREyeParameters),
-    SetProjectionMatrices([f32; 16], [f32; 16]),
-    SetStageParameters(VRStageParameters),
-    Focus,
-    Blur,
 }

@@ -9,9 +9,9 @@ extern crate libloading;
 extern crate log;
 #[cfg(all(feature = "oculusvr", target_os= "android"))]
 extern crate ovr_mobile_sys;
-#[cfg(feature = "glwindow")]
+#[cfg(any(feature = "magicleap", feature = "glwindow"))]
 extern crate euclid;
-#[cfg(feature = "glwindow")]
+#[cfg(any(feature = "magicleap", feature = "glwindow"))]
 extern crate gleam;
 #[cfg(feature = "glwindow")]
 extern crate glutin;
@@ -23,7 +23,7 @@ mod gl {
     include!(concat!(env!("OUT_DIR"), "/gles_bindings.rs"));
 }
 
-#[cfg(feature= "oculusvr")]
+#[cfg(any(feature = "magicleap", feature = "oculusvr"))]
 mod egl {
     #![allow(non_camel_case_types, non_snake_case)]
     use std::os::raw::{c_long, c_void};

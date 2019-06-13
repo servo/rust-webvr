@@ -1,3 +1,5 @@
+#![allow(bare_trait_objects)]
+
 #[macro_use]
 macro_rules! identity_matrix {
     () => ([1.0, 0.0, 0.0, 0.0,  0.0, 1.0, 0.0, 0.0,  0.0, 0.0, 1.0, 0.0,  0.0, 0.0, 0.0, 1.0]);

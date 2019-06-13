@@ -1,3 +1,5 @@
+#![allow(bare_trait_objects)]
+
 #[cfg(all(feature = "vrexternal", target_os= "android"))]
 extern crate libc;
 extern crate rust_webvr_api;
@@ -13,6 +15,8 @@ extern crate ovr_mobile_sys;
 extern crate euclid;
 #[cfg(any(feature = "magicleap", feature = "glwindow"))]
 extern crate gleam;
+#[cfg(feature = "openxr-api")]
+extern crate openxr;
 #[cfg(feature = "glwindow")]
 extern crate glutin;
 #[cfg(feature = "serde-serialization")]

@@ -23,6 +23,7 @@ default = ["vrexternal", "openvr", "mock"]
 vrexternal = []
 glwindow = ["euclid", "gleam", "glutin"]
 openvr = ["libloading"]
+openxr-api = ["openxr"]
 mock = []
 googlevr = ["gvr-sys"]
 oculusvr = ["ovr-mobile-sys"]
@@ -33,6 +34,7 @@ rust-webvr-api = { path = "../rust-webvr-api", version = "0.11.1" }
 log  = "0.4"
 gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }
+openxr = { git = "https://github.com/Ralith/openxrs", rev = "64fce8f43271ddcac971c506d22012fa35b9bdbc", optional = true, features = ["loaded"] }
 libc = "0.2"
 euclid = { version = "0.19", optional = true }
 gleam = { version = "0.6", optional = true }

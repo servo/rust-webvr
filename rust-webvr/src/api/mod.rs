@@ -25,6 +25,11 @@ mod openvr;
 #[cfg(all(target_os="windows", feature = "openvr"))]
 pub use self::openvr::OpenVRServiceCreator;
 
+#[cfg(all(target_os="windows", feature = "openxr-api"))]
+mod openxr;
+#[cfg(all(target_os="windows", feature = "openxr-api"))]
+pub use self::openxr::OpenXrService;
+
 #[cfg(all(feature = "googlevr", target_os= "android"))]
 mod googlevr;
 #[cfg(all(feature = "googlevr", target_os= "android"))]

@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.11.4"
+version = "0.12.0"
 authors = ["The Servo Project Developers"]
 
 homepage = "https://github.com/servo/rust-webvr"
@@ -29,7 +29,7 @@ oculusvr = ["ovr-mobile-sys"]
 magicleap = ["euclid", "gleam"]
 
 [dependencies]
-rust-webvr-api = { path = "../rust-webvr-api", version = "0.11.1" }
+rust-webvr-api = { path = "../rust-webvr-api", version = "0.12.0" }
 log  = "0.4"
 gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }

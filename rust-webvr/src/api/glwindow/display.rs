@@ -1,5 +1,7 @@
 use euclid::Angle;
+use euclid::RigidTransform3D;
 use euclid::Trig;
+use euclid::Vector3D;
 use gleam::gl;
 use gleam::gl::Gl;
 use rust_webvr_api::utils;
@@ -91,7 +93,7 @@ impl VRDisplay for GlWindowVRDisplay {
     }
 
     fn immediate_frame_data(&self, near: f64, far: f64) -> VRFrameData {
-        GlWindowVRDisplay::frame_data(0.0, self.size, near, far)
+        GlWindowVRDisplay::frame_data(0.0, self.size, near, far, RigidTransform3D::identity())
     }
 
     fn synced_frame_data(&self, near: f64, far: f64) -> VRFrameData {
@@ -227,15 +229,29 @@ impl GlWindowVRDisplay {
         }
     }
 
-    pub(crate) fn frame_data(timestamp: f64, size: PhysicalSize, near: f64, far: f64) -> VRFrameData {
+    pub(crate) fn frame_data(timestamp: f64, size: PhysicalSize, near: f64, far: f64, view: RigidTransform3D<f32>) -> VRFrameData {
         let left_projection_matrix = GlWindowVRDisplay::perspective(size, near, far);
         let right_projection_matrix = left_projection_matrix.clone();
 
+        let left_offset = RigidTransform3D::from_translation(Vector3D::new(EYE_DISTANCE / 2.0, 0.0, 0.0));
+        let right_offset = RigidTransform3D::from_translation(Vector3D::new(EYE_DISTANCE / 2.0, 0.0, 0.0));
+
+        let left_view_matrix = view
+            .post_mul(&left_offset)
+            .to_transform()
+            .to_column_major_array();
+
+        let right_view_matrix = view
+            .post_mul(&right_offset)
+            .to_transform()
+            .to_column_major_array();
+
         VRFrameData {
-            timestamp: timestamp,
-            // TODO: adjust matrices for stereoscopic vision
-            left_projection_matrix: left_projection_matrix,
-            right_projection_matrix: right_projection_matrix,
+            timestamp,
+            left_projection_matrix,
+            right_projection_matrix,
+            left_view_matrix,
+            right_view_matrix,
             ..VRFrameData::default()
         }
     }

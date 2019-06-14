@@ -1,5 +1,8 @@
 use gleam::gl::Gl;
 use glutin::{WindowedContext, NotCurrent};
+use glutin::EventsLoop;
+use glutin::EventsLoopClosed;
+use glutin::dpi::PhysicalSize;
 use rust_webvr_api::VRDisplayPtr;
 use rust_webvr_api::VREvent;
 use rust_webvr_api::VRGamepadPtr;
@@ -13,7 +16,6 @@ use super::display::GlWindowVRDisplay;
 use super::display::GlWindowVRDisplayPtr;
 use super::heartbeat::GlWindowVRMainThreadHeartbeat;
 use super::heartbeat::GlWindowVRMessage;
-use glutin::dpi::PhysicalSize;
 
 pub struct GlWindowVRService {
     name: String,
@@ -53,12 +55,13 @@ impl GlWindowVRService {
     pub fn new(
         name: String,
         gl_context: WindowedContext<NotCurrent>,
+	events_loop_factory: EventsLoopFactory,
         gl: Rc<dyn Gl>,
     ) -> (GlWindowVRService, GlWindowVRMainThreadHeartbeat) {
         let (sender, receiver) = channel();
         let size = gl_context.window().get_inner_size().expect("No window size");
         let hidpi = gl_context.window().get_hidpi_factor();
-        let heartbeat = GlWindowVRMainThreadHeartbeat::new(receiver, gl_context, gl);
+        let heartbeat = GlWindowVRMainThreadHeartbeat::new(receiver, gl_context, events_loop_factory, gl);
         let service = GlWindowVRService {
             name: name,
             size: size.to_physical(hidpi),
@@ -78,3 +81,5 @@ impl GlWindowVRService {
         })
     }
 }
+
+pub type EventsLoopFactory = Box<Fn() -> Result<EventsLoop, EventsLoopClosed>>;

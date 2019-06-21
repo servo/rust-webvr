@@ -234,17 +234,17 @@ impl GlWindowVRDisplay {
         let right_projection_matrix = left_projection_matrix.clone();
 
         let left_offset = RigidTransform3D::from_translation(Vector3D::new(EYE_DISTANCE / 2.0, 0.0, 0.0));
-        let right_offset = RigidTransform3D::from_translation(Vector3D::new(EYE_DISTANCE / 2.0, 0.0, 0.0));
+        let right_offset = RigidTransform3D::from_translation(Vector3D::new(-EYE_DISTANCE / 2.0, 0.0, 0.0));
 
         let left_view_matrix = view
             .post_mul(&left_offset)
             .to_transform()
-            .to_column_major_array();
+            .to_row_major_array();
 
         let right_view_matrix = view
             .post_mul(&right_offset)
             .to_transform()
-            .to_column_major_array();
+            .to_row_major_array();
 
         VRFrameData {
             timestamp,

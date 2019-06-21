@@ -239,12 +239,12 @@ impl GlWindowVRDisplay {
         let left_view_matrix = view
             .post_mul(&left_offset)
             .to_transform()
-            .to_column_major_array();
+            .to_row_major_array();
 
         let right_view_matrix = view
             .post_mul(&right_offset)
             .to_transform()
-            .to_column_major_array();
+            .to_row_major_array();
 
         VRFrameData {
             timestamp,

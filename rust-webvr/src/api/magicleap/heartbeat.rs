@@ -63,6 +63,8 @@ const DEFAULT_FAR: f32 = 10.0;
 // TODO: get the eye distance from the device
 const EYE_DISTANCE: f32 = 0.02;
 
+const Y_OFFSET: f32 = 0.5;
+
 pub struct MagicLeapVRMainThreadHeartbeat {
     display_name: String,
     receiver: Receiver<MagicLeapVRMessage>,
@@ -243,10 +245,12 @@ impl MagicLeapVRMainThreadHeartbeat {
         let rotation = Rotation3D::quaternion(quat[0], quat[1], quat[2], quat[3]);
 
         let pos = unsafe { self.cameras.virtual_cameras[index].transform.position.__bindgen_anon_1.values };
-        let translation = Vector3D::new(pos[0], pos[1], pos[2]);
+        let translation = Vector3D::new(pos[0], pos[1] - Y_OFFSET, pos[2]);
 
         let transform = RigidTransform3D::new(rotation, translation);
-        transform.to_transform().to_column_major_array()
+	// Even though we are returning a column-major array, we need to use `to_row_major`
+	// https://github.com/servo/euclid/issues/331
+        transform.inverse().to_transform().to_row_major_array()
     }
 
     fn stop_frame(&mut self, layer: VRLayer, pooled_id: PooledGLTextureId) -> Result<(), MLResult> {

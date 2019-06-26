@@ -113,18 +113,15 @@ impl MockVRState {
                 self.frame_data.pose.position = Some(position);
                 self.frame_data.pose.orientation = Some(orientation);
             }
-            MockVRControlMsg::SetEyeParameters(left, right) => {
-                self.display_data.left_eye_parameters = left;
-                self.display_data.right_eye_parameters = right;
+            MockVRControlMsg::SetViews(left, right) => {
+                self.display_data.left_eye_parameters.offset = left.offset;
+                self.display_data.right_eye_parameters.offset = right.offset;
+                self.frame_data.left_projection_matrix = left.projection;
+                self.frame_data.right_projection_matrix = right.projection;
                 self.events.push(VREvent::Display(VRDisplayEvent::Change(self.display_data.clone())))
             }
-            MockVRControlMsg::SetProjectionMatrices(left, right) => {
-                self.frame_data.left_projection_matrix = left;
-                self.frame_data.right_projection_matrix = right;
-            }
-            MockVRControlMsg::SetStageParameters(stage) => {
-                self.display_data.stage_parameters = Some(stage);
-                self.events.push(VREvent::Display(VRDisplayEvent::Change(self.display_data.clone())))
+            MockVRControlMsg::SetEyeLevel(_eye) => {
+                // do nothing for now
             }
             MockVRControlMsg::Focus => {
                 self.events.push(VREvent::Display(VRDisplayEvent::Focus(self.display_data.clone())))

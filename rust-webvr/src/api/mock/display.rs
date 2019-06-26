@@ -6,7 +6,7 @@ use std::mem;
 pub type MockVRDisplayPtr = Arc<RefCell<MockVRDisplay>>;
 use std::time::Duration;
 use std::thread;
-use super::MockVRControlMsg;
+use super::{MockVRControlMsg, MockVRInit};
 
 pub struct MockVRDisplay {
     display_id: u32,
@@ -24,12 +24,12 @@ unsafe impl Send for MockVRDisplay {}
 unsafe impl Sync for MockVRDisplay {}
 
 impl MockVRDisplay {
-    pub fn new() -> MockVRDisplayPtr {
+    pub fn new(init: MockVRInit) -> MockVRDisplayPtr {
         let display_id = utils::new_id();
         Arc::new(RefCell::new(MockVRDisplay {
             display_id,
             attributes: Default::default(),
-            state: Arc::new(Mutex::new(MockVRState::new(display_id))),
+            state: Arc::new(Mutex::new(MockVRState::new(display_id, init))),
         }))
     }
 
@@ -134,7 +134,7 @@ impl MockVRState {
 }
 
 impl MockVRState {
-    pub fn new(display_id: u32) -> Self {
+    pub fn new(display_id: u32, _init: MockVRInit) -> Self {
         let mut display_data = VRDisplayData::default();
         
         // Mock display data

@@ -1,4 +1,3 @@
-use crate::VRStageParameters;
 
 #[cfg_attr(feature = "serde-serialization", derive(Deserialize, Serialize))]
 #[derive(Debug)]

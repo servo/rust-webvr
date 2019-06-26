@@ -8,7 +8,7 @@ pub use self::vrexternal::VRExternalServiceCreator;
 #[cfg(feature = "mock")]
 mod mock;
 #[cfg(feature = "mock")]
-pub use self::mock::{MockServiceCreator, MockVRControlMsg};
+pub use self::mock::{MockServiceCreator, MockVRControlMsg, MockVRInit};
 
 #[cfg(feature = "glwindow")]
 mod glwindow;

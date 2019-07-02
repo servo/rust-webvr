@@ -18,7 +18,7 @@ use api::OpenVRServiceCreator;
 use api::OculusVRServiceCreator;
 
 #[cfg(feature = "mock")]
-use api::{MockServiceCreator, MockVRControlMsg};
+use api::{MockServiceCreator, MockVRControlMsg, MockVRInit};
 
 #[cfg(feature = "vrexternal")]
 use api::VRExternalShmemPtr;
@@ -100,8 +100,8 @@ impl VRServiceManager {
     // Register mock VR Service
     // Usefull for testing
     #[cfg(feature = "mock")]
-    pub fn register_mock_with_remote(&mut self) -> std::sync::mpsc::Sender<MockVRControlMsg> {
-        let (service, remote) = MockServiceCreator::new_service_with_remote();
+    pub fn register_mock_with_remote(&mut self, init: MockVRInit) -> std::sync::mpsc::Sender<MockVRControlMsg> {
+        let (service, remote) = MockServiceCreator::new_service_with_remote(init);
         self.register(service);
         remote
     }

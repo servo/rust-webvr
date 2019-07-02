@@ -42,7 +42,7 @@ pub mod vr_field_view;
 pub mod vr_gamepad;
 pub mod vr_main_thread_heartbeat;
 
-pub use mock::MockVRControlMsg;
+pub use mock::{MockVRControlMsg, MockVRInit, MockVRView};
 pub use vr_display::{VRDisplay,VRDisplayPtr};
 pub use vr_service::{VRService,VRServiceCreator};
 pub use vr_display_data::VRDisplayData;

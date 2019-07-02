@@ -1,6 +1,6 @@
 use {VRService, VRDisplayPtr, VREvent, VRGamepadPtr};
 use super::display::{MockVRDisplay, MockVRDisplayPtr};
-use super::MockVRControlMsg;
+use super::{MockVRControlMsg, MockVRInit};
 use std::thread;
 use std::sync::mpsc::Receiver;
 
@@ -33,14 +33,14 @@ impl VRService for MockVRService {
 }
 
 impl MockVRService {
-    pub fn new() -> MockVRService {
+    pub fn new(init: MockVRInit) -> MockVRService {
         MockVRService {
-            display: MockVRDisplay::new(),
+            display: MockVRDisplay::new(init),
         }
     }
 
-    pub fn new_with_receiver(rcv: Receiver<MockVRControlMsg>) -> MockVRService {
-        let display = MockVRDisplay::new();
+    pub fn new_with_receiver(rcv: Receiver<MockVRControlMsg>, init: MockVRInit) -> MockVRService {
+        let display = MockVRDisplay::new(init);
         let state = display.borrow().state_handle();
         thread::spawn(move || {
             while let Ok(msg) = rcv.recv() {

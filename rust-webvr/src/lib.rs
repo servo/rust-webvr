@@ -7,6 +7,10 @@ extern crate rust_webvr_api;
 extern crate gvr_sys;
 #[cfg(all(target_os="windows", feature = "openvr"))]
 extern crate libloading;
+#[cfg(all(target_os="windows", feature = "openxr-api"))]
+extern crate winapi;
+#[cfg(all(target_os="windows", feature = "openxr-api"))]
+extern crate wio;
 #[macro_use]
 extern crate log;
 #[cfg(all(feature = "oculusvr", target_os= "android"))]

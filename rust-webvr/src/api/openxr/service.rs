@@ -1,16 +1,14 @@
-use {VRService, VRDisplayPtr, VRGamepadPtr, VREvent};
+use {VRService, VRDisplay, VRDisplayPtr, VRDisplayEvent, VRDisplayEventReason, VRGamepadPtr, VREvent};
 use openxr::{ApplicationInfo, Entry, ExtensionSet, Instance};
-use openxr::sys::platform::{HDC, HGLRC};
 use std::cell::RefCell;
 use std::default::Default;
+use std::mem;
 use std::sync::Arc;
 use super::display::OpenXrDisplay;
 
 // OpenXr Service implementation
 pub struct OpenXrService {
     instance: Option<Instance>,
-    h_dc: HDC,
-    h_glrc: HGLRC,
     display: Option<VRDisplayPtr>,
     events: RefCell<Vec<VREvent>>,
 }
@@ -18,11 +16,9 @@ pub struct OpenXrService {
 unsafe impl Send for OpenXrService {}
 
 impl OpenXrService {
-    pub fn new(h_dc: HDC, h_glrc: HGLRC) -> OpenXrService {
+    pub fn new() -> OpenXrService {
         OpenXrService {
             instance: None,
-            h_dc,
-            h_glrc,
             display: None,
             events: Default::default(),
         }
@@ -43,7 +39,7 @@ impl VRService for OpenXrService {
         };
 
         let exts = ExtensionSet {
-            khr_opengl_enable: true,
+            khr_d3d11_enable: true,
             ..Default::default()
         };
 
@@ -61,10 +57,9 @@ impl VRService for OpenXrService {
         if self.display.is_none() {
             let display = OpenXrDisplay::new(
                 self.instance.as_ref().expect("uninitialized?"),
-                self.h_dc, self.h_glrc,
             )?;
             self.events.borrow_mut().push(VREvent::Display(
-                VRDisplayEvent::Activate(display.get_data(), VRDisplayEventReason::Mounted)
+                VRDisplayEvent::Activate(display.data(), VRDisplayEventReason::Mounted)
             ));
             self.display = Some(Arc::new(RefCell::new(display)));
         }

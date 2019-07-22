@@ -1,5 +1,5 @@
 use euclid::Angle;
-use euclid::RigidTransform3D;
+use euclid::default::RigidTransform3D;
 use euclid::Trig;
 use euclid::Vector3D;
 use gleam::gl;
@@ -237,12 +237,12 @@ impl GlWindowVRDisplay {
         let right_offset = RigidTransform3D::from_translation(Vector3D::new(-EYE_DISTANCE / 2.0, 0.0, 0.0));
 
         let left_view_matrix = view
-            .post_mul(&left_offset)
+            .post_transform(&left_offset)
             .to_transform()
             .to_row_major_array();
 
         let right_view_matrix = view
-            .post_mul(&right_offset)
+            .post_transform(&right_offset)
             .to_transform()
             .to_row_major_array();
 

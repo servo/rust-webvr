@@ -1,5 +1,5 @@
 use euclid::Angle;
-use euclid::RigidTransform3D;
+use euclid::default::RigidTransform3D;
 use euclid::Rotation3D;
 use euclid::Vector3D;
 use gleam::gl;
@@ -61,7 +61,7 @@ impl VRMainThreadHeartbeat for GlWindowVRMainThreadHeartbeat {
 
 impl GlWindowVRMainThreadHeartbeat {
     pub(crate) fn new(
-        receiver: Receiver<GlWindowVRMessage>, 
+        receiver: Receiver<GlWindowVRMessage>,
         gl_context: WindowedContext<NotCurrent>,
         events_loop_factory: EventsLoopFactory,
         gl: Rc<Gl>,
@@ -84,13 +84,13 @@ impl GlWindowVRMainThreadHeartbeat {
     fn handle_msg(&mut self, msg: GlWindowVRMessage) -> bool {
            match msg {
                GlWindowVRMessage::StartPresenting => {
-                    debug!("VR starting");
-                    self.gl_context.as_ref().unwrap().window().show();
-                    self.presenting = true;
-		    if self.events_loop.is_none() {
-                        self.events_loop = (self.events_loop_factory)().ok();
-		    }
-                    true
+                   debug!("VR starting");
+                   self.gl_context.as_ref().unwrap().window().show();
+                   self.presenting = true;
+                   if self.events_loop.is_none() {
+                       self.events_loop = (self.events_loop_factory)().ok();
+                   }
+                   true
                },
                GlWindowVRMessage::StartFrame(near, far, mut resolver) => {
                    debug!("VR start frame");
@@ -145,7 +145,7 @@ impl GlWindowVRMainThreadHeartbeat {
 
                    self.gl.bind_framebuffer(gl::READ_FRAMEBUFFER, self.framebuffer_id);
                    self.gl.framebuffer_texture_2d(
-                       gl::READ_FRAMEBUFFER, 
+                       gl::READ_FRAMEBUFFER,
                        gl::COLOR_ATTACHMENT0,
                        gl::TEXTURE_2D,
                        self.texture_id,
@@ -207,7 +207,7 @@ impl GlWindowVRMainThreadHeartbeat {
                             VirtualKeyCode::D => RigidTransform3D::from_rotation(Rotation3D::around_y(-ANGLE)),
                             _ => RigidTransform3D::identity(),
                         };
-                        *view = view.post_mul(&delta);
+                        *view = view.post_transform(&delta);
                     }
                 }
             })

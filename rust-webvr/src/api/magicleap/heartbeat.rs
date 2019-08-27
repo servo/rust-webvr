@@ -1,8 +1,8 @@
 use egl::types::EGLContext;
 use euclid::Angle;
-use euclid::Rotation3D;
-use euclid::Vector3D;
-use euclid::RigidTransform3D;
+use euclid::default::Rotation3D;
+use euclid::default::Vector3D;
+use euclid::default::RigidTransform3D;
 use gleam::gl::Gl;
 use gleam::gl;
 use gleam::gl::types::GLuint;

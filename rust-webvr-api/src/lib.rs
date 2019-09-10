@@ -21,7 +21,7 @@ extern crate serde_derive;
 #[cfg(feature = "ipc")]
 extern crate ipc_channel;
 
-extern crate gleam;
+extern crate sparkle;
 
 
 pub mod mock;

@@ -17,6 +17,8 @@ extern crate gleam;
 extern crate glutin;
 #[cfg(feature = "serde-serialization")]
 #[macro_use] extern crate serde_derive;
+#[cfg(any(feature = "magicleap", feature = "glwindow"))]
+extern crate sparkle;
 
 #[cfg(any(feature = "googlevr", feature= "oculusvr"))]
 mod gl {

@@ -1,5 +1,5 @@
 use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRFutureFrameData, VRGamepadPtr, VRLayer};
-use gleam::gl::Gl;
+use sparkle::gl::Gl;
 use std::sync::Arc;
 use std::cell::RefCell;
 pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;

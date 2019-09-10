@@ -21,12 +21,12 @@ build = "build.rs"
 [features]
 default = ["vrexternal", "openvr", "mock"]
 vrexternal = []
-glwindow = ["euclid", "gleam", "shine", "glutin"]
+glwindow = ["euclid", "gleam", "sparkle", "glutin"]
 openvr = ["libloading"]
 mock = []
 googlevr = ["gvr-sys"]
 oculusvr = ["ovr-mobile-sys"]
-magicleap = ["euclid", "gleam", "shine"]
+magicleap = ["euclid", "gleam", "sparkle"]
 
 [dependencies]
 rust-webvr-api = { path = "../rust-webvr-api", version = "0.16" }

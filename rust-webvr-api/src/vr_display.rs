@@ -2,7 +2,7 @@ use {VRDisplayData, VRFramebuffer, VRFramebufferAttributes, VRFrameData, VRFutur
 use sparkle::gl::Gl;
 use std::sync::Arc;
 use std::cell::RefCell;
-pub type VRDisplayPtr = Arc<RefCell<VRDisplay>>;
+pub type VRDisplayPtr = Arc<RefCell<dyn VRDisplay>>;
 
 /// The VRDisplay traits forms the base of all VR device implementations
 pub trait VRDisplay: Send + Sync {
@@ -79,8 +79,8 @@ pub trait VRDisplay: Send + Sync {
     fn stop_present(&mut self) {}
 }
 
-impl PartialEq for VRDisplay {
-    fn eq(&self, other: &VRDisplay) -> bool {
+impl PartialEq for dyn VRDisplay {
+    fn eq(&self, other: &dyn VRDisplay) -> bool {
         self.id() == other.id()
     }
 }

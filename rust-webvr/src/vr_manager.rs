@@ -30,7 +30,7 @@ use api::VRExternalServiceCreator;
 // Single entry point all the VRServices and displays
 pub struct VRServiceManager {
     initialized: bool,
-    services: Vec<Box<VRService>>,
+    services: Vec<Box<dyn VRService>>,
     displays: HashMap<u32, VRDisplayPtr>,
     gamepads: HashMap<u32, VRGamepadPtr>
 }
@@ -57,7 +57,7 @@ impl VRServiceManager {
 
     // Register default VR services specified in crate's features
     pub fn register_defaults(&mut self) {
-        let creators: Vec<Box<VRServiceCreator>> = vec!(
+        let creators: Vec<Box<dyn VRServiceCreator>> = vec!(
             #[cfg(target_os = "windows")]
             #[cfg(feature = "openvr")]
             OpenVRServiceCreator::new(),
@@ -107,7 +107,7 @@ impl VRServiceManager {
     }
 
     // Register a new VR service
-    pub fn register(&mut self, service: Box<VRService>) {
+    pub fn register(&mut self, service: Box<dyn VRService>) {
         self.services.push(service);
     }
     

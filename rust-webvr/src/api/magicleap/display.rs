@@ -1,7 +1,3 @@
-use gleam::gl;
-use gleam::gl::Gl;
-use gleam::gl::types::GLint;
-use gleam::gl::types::GLuint;
 use rust_webvr_api::VRDisplay;
 use rust_webvr_api::VRDisplayData;
 use rust_webvr_api::VRFrameData;
@@ -10,6 +6,10 @@ use rust_webvr_api::VRFramebuffer;
 use rust_webvr_api::VRFramebufferAttributes;
 use rust_webvr_api::VRGamepadPtr;
 use rust_webvr_api::VRLayer;
+use sparkle::gl;
+use sparkle::gl::Gl;
+use sparkle::gl::types::GLint;
+use sparkle::gl::types::GLuint;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::sync::mpsc::Sender;

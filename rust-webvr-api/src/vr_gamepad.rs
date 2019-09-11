@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::cell::RefCell;
 use VRPose;
 
-pub type VRGamepadPtr = Arc<RefCell<VRGamepad>>;
+pub type VRGamepadPtr = Arc<RefCell<dyn VRGamepad>>;
 
 pub trait VRGamepad {
     fn id(&self) -> u32;

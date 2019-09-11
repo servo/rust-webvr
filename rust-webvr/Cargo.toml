@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.15.0"
+version = "0.16.0"
 authors = ["The Servo Project Developers"]
 
 homepage = "https://github.com/servo/rust-webvr"
@@ -21,22 +21,23 @@ build = "build.rs"
 [features]
 default = ["vrexternal", "openvr", "mock"]
 vrexternal = []
-glwindow = ["euclid", "gleam", "glutin"]
+glwindow = ["euclid", "gleam", "sparkle", "glutin"]
 openvr = ["libloading"]
 mock = []
 googlevr = ["gvr-sys"]
 oculusvr = ["ovr-mobile-sys"]
-magicleap = ["euclid", "gleam"]
+magicleap = ["euclid", "gleam", "sparkle"]
 
 [dependencies]
-rust-webvr-api = { path = "../rust-webvr-api", version = "0.15" }
+rust-webvr-api = { path = "../rust-webvr-api", version = "0.16" }
 log  = "0.4"
 gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }
 libc = "0.2"
 euclid = { version = "0.20", optional = true }
-gleam = { version = "0.7", optional = true }
+gleam = { version = "0.6", optional = true }
 glutin = { version = "0.21", optional = true }
+sparkle = { version = "0.1", optional = true }
 
 [target.'cfg(target_os="windows")'.dependencies]
 libloading = { version = "0.5", optional = true, default-features = false }

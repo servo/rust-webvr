@@ -44,8 +44,8 @@ impl VRFrameData {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut vec = vec![0u8; mem::size_of::<VRFrameData>()];
         unsafe {
-            ptr::copy_nonoverlapping(mem::transmute(self),
-                                    vec.as_mut_ptr(),
+            ptr::copy_nonoverlapping(self,
+                                    vec.as_mut_ptr() as *mut VRFrameData,
                                     mem::size_of::<VRFrameData>());
         }
         vec
@@ -53,12 +53,11 @@ impl VRFrameData {
 
     pub fn from_bytes(bytes: &[u8]) -> VRFrameData {
         unsafe {
-            let mut result: VRFrameData = mem::uninitialized();
+            let mut result = mem::MaybeUninit::uninit();
             ptr::copy_nonoverlapping(bytes.as_ptr(),
-                                     mem::transmute(&mut result),
+                                     result.as_mut_ptr() as *mut u8,
                                      mem::size_of::<VRFrameData>());
-
-            result        
+            result.assume_init()
         }
     }
 }

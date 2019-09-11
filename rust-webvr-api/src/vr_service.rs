@@ -15,5 +15,5 @@ pub trait VRService: Send {
 }
 
 pub trait VRServiceCreator {
-    fn new_service(&self) -> Box<VRService>;
+    fn new_service(&self) -> Box<dyn VRService>;
 }

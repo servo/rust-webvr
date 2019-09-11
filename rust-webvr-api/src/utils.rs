@@ -23,7 +23,7 @@ pub fn timestamp() -> f64 {
 // Multiply 4x4 matrices
 #[allow(dead_code)]
 pub fn multiply_matrix(a: &[f32; 16], b: &[f32; 16], out: &mut [f32; 16]) {
-    let mut tmp: [f32; 16] = unsafe { mem::uninitialized() };
+    let mut tmp: [f32; 16] = [0.; 16];
 
     tmp[0] = b[0] * a[0] + b[1] * a[4] + b[2] * a[8] + b[3] * a[12];
     tmp[1] = b[0] * a[1] + b[1] * a[5] + b[2] * a[9] + b[3] * a[13];
@@ -65,7 +65,7 @@ pub fn inverse_matrix(m: &[f32; 16], out: &mut [f32; 16]) -> bool {
 
 #[allow(dead_code)]
 pub fn adjoint_matrix(m: &[f32; 16], out: &mut [f32; 16]) {
-    let mut tmp: [f32; 16] = unsafe { mem::uninitialized() };
+    let mut tmp: [f32; 16] = [0.; 16];
 
     tmp[0]  =   determinant3x3(m[5], m[9], m[13], m[6], m[10], m[14], m[7], m[11], m[15]);
     tmp[4]  = - determinant3x3(m[4], m[8], m[12], m[6], m[10], m[14], m[7], m[11], m[15]);

@@ -1,6 +1,6 @@
 [package]
 name = "rust-webvr"
-version = "0.16.1"
+version = "0.17.0"
 authors = ["The Servo Project Developers"]
 
 homepage = "https://github.com/servo/rust-webvr"

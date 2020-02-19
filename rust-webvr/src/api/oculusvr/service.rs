@@ -279,9 +279,9 @@ impl OVRJava {
                 let env = jni_scope.env;
 
                 // Initialize native VrApi
-                self.java.Vm = mem::transmute(&mut (*jni_scope.vm).functions);
-                self.java.Env = mem::transmute(&mut (*env).functions);
                 self.java.ActivityObject = (jni.NewGlobalRef)(env, jni_scope.activity) as *mut _;
+                self.java.Env = mem::transmute(&mut (*env).functions);
+                self.java.Vm = mem::transmute(&mut (*jni_scope.vm).functions);
             }
             self.jni_scope = Some(jni_scope);
 

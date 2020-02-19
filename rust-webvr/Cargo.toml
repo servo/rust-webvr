@@ -29,7 +29,7 @@ oculusvr = ["ovr-mobile-sys"]
 magicleap = ["euclid", "gleam", "sparkle"]
 
 [dependencies]
-rust-webvr-api = { path = "../rust-webvr-api", version = "0.16" }
+rust-webvr-api = { path = "../rust-webvr-api", version = "0.17" }
 log  = "0.4"
 gvr-sys = { version = "0.7", optional = true }
 ovr-mobile-sys = { version = "0.4", optional = true }

@@ -16,3 +16,9 @@ Run room scale demo on android:
 ```
 ./run_android.sh
 ```
+
+### OpenVR tips:
+
+In order to run with openvr on windows, `openvr_api.dll` must be available. Please make it either accessible in your path, or copy it into the examples/room folder.
+
+Refer to [The ValveSoftware openvr repository](https://github.com/ValveSoftware/openvr) and head over to the releases section for more information.

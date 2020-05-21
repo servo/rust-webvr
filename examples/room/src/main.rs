@@ -539,7 +539,7 @@ pub fn main() {
     display.borrow_mut().start_present(Some(attributes));
 
     let vr_fbos = display.borrow().get_framebuffers();
-    assert!(vr_fbos.len() > 0);
+    assert!(!direct_draw || vr_fbos.len() > 0);
 
     if multiview && !vr_fbos.first().unwrap().attributes.multiview {
         panic!("Multiview not supported in this Device");
